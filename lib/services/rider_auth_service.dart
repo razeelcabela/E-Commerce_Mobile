@@ -79,10 +79,9 @@ class RiderAuthService {
 
       // Step 4: Create user profile in database
       try {
-        await _db.from('users').insert({
+        final userResult = await _db.from('users').insert({
           'email': email.trim(),
           'auth_user_id': userId,
-          'password': password,
           'first_name': firstName,
           'last_name': lastName,
           'phone': phoneNumber.trim(),
@@ -90,13 +89,15 @@ class RiderAuthService {
           'account_status': 'active',
           'buyer_approval_status': 'pending',
           'created_at': DateTime.now().toIso8601String(),
-        });
+        }).select('id').single();
 
         developer.log('User profile created successfully');
 
+        final userIntId = userResult['id'] as int;
+
         // Step 5: Create rider profile
         final riderResult = await _db.from('riders').insert({
-          'user_id': userId,
+          'user_id': userIntId,
           'auth_user_id': userId,
           'license_number': driversLicense.trim(),
           'vehicle_type': 'motorcycle',

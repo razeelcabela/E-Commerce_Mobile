@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
-import 'config/supabase_diagnostic.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/role_selection_screen.dart';
@@ -75,10 +74,6 @@ void main() async {
     debugPrint('❌ Supabase initialization error: $e');
     rethrow;
   }
-
-  // STEP 5: Run diagnostics
-  debugPrint('\n📡 Running Supabase Connectivity Diagnostics...\n');
-  await SupabaseDiagnostic.runAllDiagnostics(url, key);
 
   runApp(const MyApp());
 }

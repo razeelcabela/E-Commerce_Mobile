@@ -8,14 +8,41 @@ class SellerLoginScreen extends StatefulWidget {
   State<SellerLoginScreen> createState() => _SellerLoginScreenState();
 }
 
-class _SellerLoginScreenState extends State<SellerLoginScreen> {
+class _SellerLoginScreenState extends State<SellerLoginScreen>
+    with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscurePass = true;
   bool _loading = false;
 
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fade = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
+    ));
+    _ctrl.forward();
+  }
+
   @override
   void dispose() {
+    _ctrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -50,8 +77,7 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
         content: Text(msg),
         backgroundColor: const Color(0xFF0A0A0A),
         behavior: SnackBarBehavior.floating,
-        shape:
-            const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -62,152 +88,151 @@ class _SellerLoginScreenState extends State<SellerLoginScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 24 : 0,
-            vertical: 48,
-          ),
-          child: SizedBox(
-            width: 420,
-            child: Column(
-              children: [
-                // Brand header
-                const Text(
-                  'VARÓN',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w300,
-                    color: Color(0xFF0A0A0A),
-                    letterSpacing: 8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'SELLER PORTAL',
-                  style: TextStyle(
-                    fontSize: 8,
-                    color: Color(0xFF999999),
-                    letterSpacing: 4,
-                  ),
-                ),
-                const SizedBox(height: 48),
-
-                // Login card
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      const Text(
-                        'SIGN IN',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 3,
-                          color: Color(0xFF0A0A0A),
-                        ),
+      body: FadeTransition(
+        opacity: _fade,
+        child: SlideTransition(
+          position: _slide,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 24 : 0,
+                vertical: 48,
+              ),
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  children: [
+                    const Text(
+                      'VARÓN',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w300,
+                        color: Color(0xFF0A0A0A),
+                        letterSpacing: 8,
                       ),
-                      const SizedBox(height: 6),
-                      Container(
-                        width: 24,
-                        height: 1.5,
-                        color: const Color(0xFF0A0A0A),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'SELLER PORTAL',
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: Color(0xFF999999),
+                        letterSpacing: 4,
                       ),
-                      const SizedBox(height: 32),
-                      Container(height: 1, color: const Color(0xFFEEEEEE)),
-                      const SizedBox(height: 32),
+                    ),
+                    const SizedBox(height: 48),
 
-                      // Email
-                      _field('EMAIL ADDRESS', _emailCtrl,
-                          keyboardType: TextInputType.emailAddress),
-                      const SizedBox(height: 20),
-
-                      // Password
-                      _field(
-                        'PASSWORD',
-                        _passCtrl,
-                        obscure: _obscurePass,
-                        onToggle: () =>
-                            setState(() => _obscurePass = !_obscurePass),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Sign in button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _signIn,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A0A0A),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            disabledBackgroundColor:
-                                const Color(0xFF888888),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: _loading
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'SIGN IN',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2.5,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Back link
-                      Center(
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'Back to buyer login',
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.all(36),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'SIGN IN',
                             style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF888888),
-                              decoration: TextDecoration.underline,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 3,
+                              color: Color(0xFF0A0A0A),
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Registration hint
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        color: const Color(0xFFF6F6F6),
-                        child: const Text(
-                          'No account yet? Apply as a seller from the '
-                          'buyer profile section in the app.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF888888),
-                            height: 1.6,
+                          const SizedBox(height: 6),
+                          Container(
+                            width: 24,
+                            height: 1.5,
+                            color: const Color(0xFF0A0A0A),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+                          const SizedBox(height: 32),
+                          Container(height: 1, color: const Color(0xFFEEEEEE)),
+                          const SizedBox(height: 32),
+
+                          _field('EMAIL ADDRESS', _emailCtrl,
+                              keyboardType: TextInputType.emailAddress),
+                          const SizedBox(height: 20),
+
+                          _field(
+                            'PASSWORD',
+                            _passCtrl,
+                            obscure: _obscurePass,
+                            onToggle: () =>
+                                setState(() => _obscurePass = !_obscurePass),
+                          ),
+                          const SizedBox(height: 32),
+
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _loading ? null : _signIn,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0A0A0A),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                disabledBackgroundColor:
+                                    const Color(0xFF888888),
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                ),
+                              ),
+                              child: _loading
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'SIGN IN',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 2.5,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          Center(
+                            child: GestureDetector(
+                              onTap: () => Navigator.of(context).pop(),
+                              child: const Text(
+                                '← Back to portal selection',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF888888),
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Color(0xFF888888),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            color: const Color(0xFFF6F6F6),
+                            child: const Text(
+                              'No account yet? Apply as a seller from the '
+                              'buyer profile section in the app.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF888888),
+                                height: 1.6,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),

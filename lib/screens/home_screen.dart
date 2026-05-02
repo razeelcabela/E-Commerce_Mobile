@@ -19,18 +19,52 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _heroFade;
+  late final Animation<Offset> _heroSlide;
+  late final Animation<double> _sectionFade;
+
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _heroFade = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+    );
+    _heroSlide = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
+    ));
+    _sectionFade = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+    );
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _logout() async {
     await AuthService.logout();
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/login');
-    }
+    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
   }
 
-  void _shopNow() {
-    Navigator.of(context).pushNamed('/shop');
-  }
+  void _shopNow() => Navigator.of(context).pushNamed('/shop');
 
   void _navigateToScreen(String label, BuildContext context) {
     switch (label.toLowerCase()) {
@@ -41,25 +75,19 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.of(context).pushNamed('/shop');
         break;
       case 'shirts':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const ShopScreen(category: 'Shirts'),
-          ),
-        );
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const ShopScreen(category: 'Shirts'),
+        ));
         break;
       case 'pants':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const ShopScreen(category: 'Pants'),
-          ),
-        );
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const ShopScreen(category: 'Pants'),
+        ));
         break;
       case 'cart':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const CartScreen(),
-          ),
-        );
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const CartScreen(),
+        ));
         break;
       case 'profile':
         _showProfileSheet(context);
@@ -82,22 +110,108 @@ class _HomeScreenState extends State<HomeScreen> {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.white,
+      drawer: isMobile ? _buildDrawer(context) : null,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
               _buildHeader(context, isMobile),
               _buildHeroSection(context, isMobile),
-              _buildCategoriesSection(context, isMobile),
-              _buildFeaturedProducts(context, isMobile),
-              _buildFooter(context, isMobile),
+              FadeTransition(
+                opacity: _sectionFade,
+                child: Column(
+                  children: [
+                    _buildCategoriesSection(context, isMobile),
+                    _buildFeaturedProducts(context, isMobile),
+                    _buildFooter(context, isMobile),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  // ── Drawer (mobile nav) ──────────────────────────────────────────────────
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 16, 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'VARÓN',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 7,
+                      color: Color(0xFF0A0A0A),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF0A0A0A)),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+            Container(height: 1, color: const Color(0xFFEEEEEE)),
+            const SizedBox(height: 8),
+            for (final label in ['HOME', 'SHOP', 'SHIRTS', 'PANTS', 'CART', 'PROFILE'])
+              _DrawerNavItem(
+                label: label,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _navigateToScreen(label, context);
+                },
+              ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+              child: SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _logout();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF0A0A0A)),
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text(
+                    'SIGN OUT',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2.5,
+                      color: Color(0xFF0A0A0A),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Header ───────────────────────────────────────────────────────────────
 
   Widget _buildHeader(BuildContext context, bool isMobile) {
     return Container(
@@ -106,83 +220,53 @@ class _HomeScreenState extends State<HomeScreen> {
         horizontal: isMobile ? 20 : 48,
         vertical: 22,
       ),
-      child: Column(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'VARÓN',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF0A0A0A),
-                  letterSpacing: 7,
-                ),
-              ),
-
-              if (!isMobile)
-                Row(
-                  children: [
-                    _navLink('HOME'),
-                    _navLink('SHOP'),
-                    _navLink('SHIRTS'),
-                    _navLink('PANTS'),
-                    _navLink('CART'),
-                    PopupMenuButton<String>(
-                      onSelected: (String result) {
-                        if (result == 'logout') _logout();
-                        if (result == 'profile') _showProfileSheet(context);
-                      },
-                      itemBuilder: (BuildContext context) => const <PopupMenuEntry<String>>[
-                        PopupMenuItem<String>(
-                          value: 'profile',
-                          child: Text('Profile'),
-                        ),
-                        PopupMenuDivider(),
-                        PopupMenuItem<String>(
-                          value: 'logout',
-                          child: Text('Logout'),
-                        ),
-                      ],
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 14),
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: IconButton(
-                            icon: Icon(Icons.account_circle_outlined, color: Color(0xFF0A0A0A), size: 20),
-                            onPressed: null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-              if (isMobile)
-                IconButton(
-                  icon: const Icon(Icons.menu, color: Color(0xFF0A0A0A), size: 20),
-                  onPressed: () {},
-                ),
-            ],
+          const Text(
+            'VARÓN',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w300,
+              color: Color(0xFF0A0A0A),
+              letterSpacing: 7,
+            ),
           ),
-
+          if (!isMobile)
+            Row(
+              children: [
+                _navLink('HOME'),
+                _navLink('SHOP'),
+                _navLink('SHIRTS'),
+                _navLink('PANTS'),
+                _navLink('CART'),
+                PopupMenuButton<String>(
+                  onSelected: (result) {
+                    if (result == 'logout') _logout();
+                    if (result == 'profile') _showProfileSheet(context);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'profile', child: Text('Profile')),
+                    PopupMenuDivider(),
+                    PopupMenuItem(value: 'logout', child: Text('Logout')),
+                  ],
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Icon(Icons.account_circle_outlined,
+                          color: Color(0xFF0A0A0A), size: 20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           if (isMobile)
-            Padding(
-              padding: const EdgeInsets.only(top: 20),
-              child: Wrap(
-                spacing: 2,
-                runSpacing: 4,
-                alignment: WrapAlignment.center,
-                children: [
-                  _mobileNavLink('HOME'),
-                  _mobileNavLink('SHOP'),
-                  _mobileNavLink('SHIRTS'),
-                  _mobileNavLink('PANTS'),
-                  _mobileNavLink('CART'),
-                  _mobileNavLink('PROFILE'),
-                ],
-              ),
+            IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF0A0A0A), size: 22),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
         ],
       ),
@@ -192,47 +276,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _navLink(String label) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: TextButton(
-        onPressed: () => _navigateToScreen(label, context),
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          overlayColor: Colors.transparent,
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF0A0A0A),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
-          ),
-        ),
+      child: _HoverLink(
+        label: label,
+        onTap: () => _navigateToScreen(label, context),
       ),
     );
   }
 
-  Widget _mobileNavLink(String label) {
-    return TextButton(
-      onPressed: () => _navigateToScreen(label, context),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        overlayColor: Colors.transparent,
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Color(0xFF0A0A0A),
-          fontSize: 9,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 2,
-        ),
-      ),
-    );
-  }
+  // ── Hero ─────────────────────────────────────────────────────────────────
 
   Widget _buildHeroSection(BuildContext context, bool isMobile) {
     return Container(
@@ -242,59 +293,48 @@ class _HomeScreenState extends State<HomeScreen> {
         horizontal: isMobile ? 24 : 48,
         vertical: isMobile ? 80 : 128,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Elevate Your Style\nwith Varón',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: isMobile ? 36 : 64,
-              fontWeight: FontWeight.w200,
-              color: const Color(0xFF0A0A0A),
-              height: 1.1,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'PREMIUM MINIMALIST FASHION',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 10,
-              color: Color(0xFF888888),
-              letterSpacing: 5,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 48),
-          ElevatedButton(
-            onPressed: _shopNow,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A0A0A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 56,
-                vertical: 18,
+      child: FadeTransition(
+        opacity: _heroFade,
+        child: SlideTransition(
+          position: _heroSlide,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Elevate Your Style\nwith Varón',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isMobile ? 36 : 64,
+                  fontWeight: FontWeight.w200,
+                  color: const Color(0xFF0A0A0A),
+                  height: 1.1,
+                  letterSpacing: -0.5,
+                ),
               ),
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.zero,
+              const SizedBox(height: 24),
+              const Text(
+                'PREMIUM MINIMALIST FASHION',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF888888),
+                  letterSpacing: 5,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
-              elevation: 0,
-            ),
-            child: const Text(
-              'SHOP NOW',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 3,
+              const SizedBox(height: 48),
+              _HoverButton(
+                label: 'SHOP NOW',
+                onTap: _shopNow,
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+
+  // ── Section header ────────────────────────────────────────────────────────
 
   Widget _buildSectionHeader(String title) {
     return Column(
@@ -310,20 +350,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        Container(
-          width: 28,
-          height: 1,
-          color: const Color(0xFF0A0A0A),
-        ),
+        Container(width: 28, height: 1, color: const Color(0xFF0A0A0A)),
       ],
     );
   }
 
+  // ── Categories ────────────────────────────────────────────────────────────
+
   Widget _buildCategoriesSection(BuildContext context, bool isMobile) {
     final categories = [
-      {'name': 'Shirts', 'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop'},
-      {'name': 'Pants', 'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop'},
-      {'name': 'T-Shirts', 'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop'},
+      {'name': 'Shirts',      'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop'},
+      {'name': 'Pants',       'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop'},
+      {'name': 'T-Shirts',    'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop'},
       {'name': 'Accessories', 'image': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop'},
     ];
 
@@ -339,158 +377,44 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildSectionHeader('SHOP BY CATEGORY'),
           SizedBox(height: isMobile ? 28 : 40),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = isMobile ? 2 : 4;
-              final spacing = isMobile ? 10.0 : 16.0;
-              final itemWidth =
-                  (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
-                      crossAxisCount;
-              final itemHeight = isMobile ? itemWidth * 1.25 : itemWidth * 1.15;
-
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: spacing,
-                  mainAxisSpacing: spacing,
-                  childAspectRatio: itemWidth / itemHeight,
-                ),
-                itemCount: categories.length,
-                itemBuilder: (context, index) {
-                  return _buildCategoryCard(
-                    categories[index]['name']!,
-                    categories[index]['image']!,
-                    isMobile,
-                  );
-                },
-              );
-            },
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            final cols    = isMobile ? 2 : 4;
+            final spacing = isMobile ? 10.0 : 16.0;
+            final w       = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+            final h       = isMobile ? w * 1.25 : w * 1.15;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: spacing,
+                childAspectRatio: w / h,
+              ),
+              itemCount: categories.length,
+              itemBuilder: (_, i) => _CategoryCard(
+                category: categories[i]['name']!,
+                imageUrl: categories[i]['image']!,
+                isMobile: isMobile,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => ShopScreen(category: categories[i]['name']!),
+                )),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryCard(String category, String imageUrl, bool isMobile) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ShopScreen(category: category),
-          ),
-        );
-      },
-      child: Container(
-        color: Colors.white,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: SizedBox(
-                width: double.infinity,
-                height: isMobile ? 110 : 150,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return SizedBox(
-                      height: isMobile ? 110 : 150,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                          strokeWidth: 1,
-                          color: const Color(0xFF0A0A0A),
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return SizedBox(
-                      height: isMobile ? 110 : 150,
-                      child: Center(
-                        child: Icon(
-                          Icons.image_outlined,
-                          size: isMobile ? 24 : 32,
-                          color: const Color(0xFFCCCCCC),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                isMobile ? 10 : 14,
-                isMobile ? 10 : 12,
-                isMobile ? 10 : 14,
-                isMobile ? 10 : 12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    category.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: isMobile ? 9 : 10,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0A0A0A),
-                      letterSpacing: 2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: isMobile ? 2 : 3),
-                  Text(
-                    'Explore collection',
-                    style: TextStyle(
-                      fontSize: isMobile ? 9 : 10,
-                      color: const Color(0xFF999999),
-                      letterSpacing: 0.3,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ── Featured products ─────────────────────────────────────────────────────
 
   Widget _buildFeaturedProducts(BuildContext context, bool isMobile) {
     final products = [
-      {
-        'name': 'Classic White Shirt',
-        'price': '₱1,299',
-        'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop',
-      },
-      {
-        'name': 'Slim Fit Black Pants',
-        'price': '₱1,899',
-        'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop',
-      },
-      {
-        'name': 'Premium Cotton T-Shirt',
-        'price': '₱599',
-        'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
-      },
-      {
-        'name': 'Leather Minimalist Belt',
-        'price': '₱899',
-        'image': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop',
-      },
+      {'name': 'Classic White Shirt',     'price': '₱1,299', 'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop'},
+      {'name': 'Slim Fit Black Pants',    'price': '₱1,899', 'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop'},
+      {'name': 'Premium Cotton T-Shirt',  'price': '₱599',   'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop'},
+      {'name': 'Leather Minimalist Belt', 'price': '₱899',   'image': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop'},
     ];
 
     return Container(
@@ -505,162 +429,47 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildSectionHeader('FEATURED PRODUCTS'),
           SizedBox(height: isMobile ? 28 : 40),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final crossAxisCount = isMobile ? 2 : 4;
-              final spacing = isMobile ? 10.0 : 16.0;
-              final itemWidth =
-                  (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
-                      crossAxisCount;
-              final itemHeight = isMobile ? itemWidth * 1.75 : itemWidth * 1.55;
-
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: spacing,
-                  mainAxisSpacing: spacing,
-                  childAspectRatio: itemWidth / itemHeight,
+          LayoutBuilder(builder: (context, constraints) {
+            final cols    = isMobile ? 2 : 4;
+            final spacing = isMobile ? 10.0 : 16.0;
+            final w       = (constraints.maxWidth - spacing * (cols - 1)) / cols;
+            final h       = isMobile ? w * 1.75 : w * 1.55;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: cols,
+                crossAxisSpacing: spacing,
+                mainAxisSpacing: spacing,
+                childAspectRatio: w / h,
+              ),
+              itemCount: products.length,
+              itemBuilder: (_, i) => _ProductCard(
+                name: products[i]['name']!,
+                price: products[i]['price']!,
+                imageUrl: products[i]['image']!,
+                isMobile: isMobile,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const ShopScreen(),
+                )),
+                onAddToCart: () => ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${products[i]['name']} added to cart'),
+                    backgroundColor: const Color(0xFF0A0A0A),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  ),
                 ),
-                itemCount: products.length,
-                itemBuilder: (context, index) {
-                  return _buildProductCard(
-                    products[index]['name']!,
-                    products[index]['price']!,
-                    products[index]['image']!,
-                    isMobile,
-                  );
-                },
-              );
-            },
-          ),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildProductCard(
-    String name,
-    String price,
-    String imageUrl,
-    bool isMobile,
-  ) {
-    final imageHeight = isMobile ? 130.0 : 180.0;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const ShopScreen(),
-          ),
-        );
-      },
-      child: Container(
-        color: Colors.white,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                height: imageHeight,
-                width: double.infinity,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return SizedBox(
-                    height: imageHeight,
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                        strokeWidth: 1,
-                        color: const Color(0xFF0A0A0A),
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return SizedBox(
-                    height: imageHeight,
-                    child: Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        size: isMobile ? 28 : 36,
-                        color: const Color(0xFFCCCCCC),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            SizedBox(height: isMobile ? 8 : 12),
-            SizedBox(
-              height: isMobile ? 28 : 34,
-              child: Text(
-                name,
-                style: TextStyle(
-                  fontSize: isMobile ? 11 : 12,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF0A0A0A),
-                  letterSpacing: 0.2,
-                  height: 1.4,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(height: isMobile ? 2 : 4),
-            Text(
-              price,
-              style: TextStyle(
-                fontSize: isMobile ? 12 : 13,
-                color: const Color(0xFF0A0A0A),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
-            ),
-            SizedBox(height: isMobile ? 8 : 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('$name added to cart'),
-                      backgroundColor: const Color(0xFF0A0A0A),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF0A0A0A), width: 1),
-                  padding: EdgeInsets.symmetric(vertical: isMobile ? 8 : 10),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
-                  minimumSize: Size(0, isMobile ? 30 : 38),
-                ),
-                child: Text(
-                  'ADD TO CART',
-                  style: TextStyle(
-                    fontSize: isMobile ? 8 : 9,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0A0A0A),
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ── Footer ────────────────────────────────────────────────────────────────
 
   Widget _buildFooter(BuildContext context, bool isMobile) {
     return Container(
@@ -696,42 +505,26 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 8,
                       color: Color(0xFF666666),
                       letterSpacing: 3,
-                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
               ),
-              if (!isMobile)
-                Row(
-                  children: [
-                    _footerIcon(Icons.facebook),
-                    _footerIcon(Icons.photo_camera_outlined),
-                    _footerIcon(Icons.share_outlined),
-                  ],
-                ),
+              if (!isMobile) _socialIcons(),
             ],
           ),
           const SizedBox(height: 48),
           if (isMobile) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _footerIcon(Icons.facebook),
-                _footerIcon(Icons.photo_camera_outlined),
-                _footerIcon(Icons.share_outlined),
-              ],
-            ),
+            Center(child: _socialIcons()),
             const SizedBox(height: 40),
           ],
           Container(height: 1, color: const Color(0xFF1E1E1E)),
           const SizedBox(height: 28),
           const Text(
-            '© 2024 VARÓN. ALL RIGHTS RESERVED.',
+            '© 2025 VARÓN. ALL RIGHTS RESERVED.',
             style: TextStyle(
               fontSize: 8,
               color: Color(0xFF555555),
               letterSpacing: 2,
-              fontWeight: FontWeight.w400,
             ),
           ),
         ],
@@ -739,14 +532,164 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _footerIcon(IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () {},
-          child: Icon(icon, color: const Color(0xFF666666), size: 17),
+  Widget _socialIcons() {
+    return Row(
+      children: [
+        _FooterIcon(icon: Icons.facebook),
+        _FooterIcon(icon: Icons.photo_camera_outlined),
+        _FooterIcon(icon: Icons.share_outlined),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Small reusable widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HoverLink extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _HoverLink({required this.label, required this.onTap});
+
+  @override
+  State<_HoverLink> createState() => _HoverLinkState();
+}
+
+class _HoverLinkState extends State<_HoverLink> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 150),
+          style: TextStyle(
+            color: _hovered ? const Color(0xFF555555) : const Color(0xFF0A0A0A),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 2,
+            fontFamily: 'Poppins',
+          ),
+          child: Text(widget.label),
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverButton extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _HoverButton({required this.label, required this.onTap});
+
+  @override
+  State<_HoverButton> createState() => _HoverButtonState();
+}
+
+class _HoverButtonState extends State<_HoverButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 56, vertical: 18),
+          color: _hovered ? const Color(0xFF333333) : const Color(0xFF0A0A0A),
+          child: Text(
+            widget.label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 3,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerNavItem extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _DrawerNavItem({required this.label, required this.onTap});
+
+  @override
+  State<_DrawerNavItem> createState() => _DrawerNavItemState();
+}
+
+class _DrawerNavItemState extends State<_DrawerNavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          color: _hovered ? const Color(0xFFF6F6F6) : Colors.white,
+          child: Text(
+            widget.label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2.5,
+              color: Color(0xFF0A0A0A),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FooterIcon extends StatefulWidget {
+  final IconData icon;
+  const _FooterIcon({required this.icon});
+
+  @override
+  State<_FooterIcon> createState() => _FooterIconState();
+}
+
+class _FooterIconState extends State<_FooterIcon> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: () {},
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            child: Icon(
+              widget.icon,
+              size: 17,
+              color: _hovered ? Colors.white : const Color(0xFF666666),
+            ),
+          ),
         ),
       ),
     );
@@ -754,7 +697,309 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Profile bottom sheet
+// Category card with hover overlay
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CategoryCard extends StatefulWidget {
+  final String category;
+  final String imageUrl;
+  final bool isMobile;
+  final VoidCallback onTap;
+
+  const _CategoryCard({
+    required this.category,
+    required this.imageUrl,
+    required this.isMobile,
+    required this.onTap,
+  });
+
+  @override
+  State<_CategoryCard> createState() => _CategoryCardState();
+}
+
+class _CategoryCardState extends State<_CategoryCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final imgH = widget.isMobile ? 110.0 : 150.0;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: imgH,
+                    child: Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (_, child, progress) {
+                        if (progress == null) return child;
+                        return SizedBox(
+                          height: imgH,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1,
+                              color: Color(0xFF0A0A0A),
+                            ),
+                          ),
+                        );
+                      },
+                      errorBuilder: (_, __, ___) => SizedBox(
+                        height: imgH,
+                        child: const Center(
+                          child: Icon(Icons.image_outlined,
+                              size: 28, color: Color(0xFFCCCCCC)),
+                        ),
+                      ),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: imgH,
+                    width: double.infinity,
+                    color: _hovered
+                        ? const Color(0xFF0A0A0A).withValues(alpha: 0.18)
+                        : Colors.transparent,
+                  ),
+                ],
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  widget.isMobile ? 10 : 14,
+                  widget.isMobile ? 10 : 12,
+                  widget.isMobile ? 10 : 14,
+                  widget.isMobile ? 10 : 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      widget.category.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 9 : 10,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF0A0A0A),
+                        letterSpacing: 2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: widget.isMobile ? 2 : 3),
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 150),
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 9 : 10,
+                        color: _hovered
+                            ? const Color(0xFF0A0A0A)
+                            : const Color(0xFF999999),
+                        letterSpacing: 0.3,
+                      ),
+                      child: const Text('Explore collection'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Product card with hover elevation
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ProductCard extends StatefulWidget {
+  final String name;
+  final String price;
+  final String imageUrl;
+  final bool isMobile;
+  final VoidCallback onTap;
+  final VoidCallback onAddToCart;
+
+  const _ProductCard({
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+    required this.isMobile,
+    required this.onTap,
+    required this.onAddToCart,
+  });
+
+  @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final imgH = widget.isMobile ? 130.0 : 180.0;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          color: Colors.white,
+          transform: Matrix4.translationValues(0, _hovered ? -3 : 0, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                children: [
+                  Image.network(
+                    widget.imageUrl,
+                    fit: BoxFit.cover,
+                    height: imgH,
+                    width: double.infinity,
+                    loadingBuilder: (_, child, progress) {
+                      if (progress == null) return child;
+                      return SizedBox(
+                        height: imgH,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1,
+                            color: Color(0xFF0A0A0A),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => SizedBox(
+                      height: imgH,
+                      child: const Center(
+                        child: Icon(Icons.image_outlined,
+                            size: 32, color: Color(0xFFCCCCCC)),
+                      ),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: imgH,
+                    width: double.infinity,
+                    color: _hovered
+                        ? const Color(0xFF0A0A0A).withValues(alpha: 0.06)
+                        : Colors.transparent,
+                  ),
+                ],
+              ),
+              SizedBox(height: widget.isMobile ? 8 : 12),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: widget.isMobile ? 2 : 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: widget.isMobile ? 28 : 34,
+                      child: Text(
+                        widget.name,
+                        style: TextStyle(
+                          fontSize: widget.isMobile ? 11 : 12,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF0A0A0A),
+                          letterSpacing: 0.2,
+                          height: 1.4,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(height: widget.isMobile ? 2 : 4),
+                    Text(
+                      widget.price,
+                      style: TextStyle(
+                        fontSize: widget.isMobile ? 12 : 13,
+                        color: const Color(0xFF0A0A0A),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    SizedBox(height: widget.isMobile ? 8 : 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _AddToCartButton(
+                        isMobile: widget.isMobile,
+                        onTap: widget.onAddToCart,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddToCartButton extends StatefulWidget {
+  final bool isMobile;
+  final VoidCallback onTap;
+  const _AddToCartButton({required this.isMobile, required this.onTap});
+
+  @override
+  State<_AddToCartButton> createState() => _AddToCartButtonState();
+}
+
+class _AddToCartButtonState extends State<_AddToCartButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: EdgeInsets.symmetric(
+              vertical: widget.isMobile ? 8 : 10),
+          color: _hovered ? const Color(0xFF0A0A0A) : Colors.white,
+          decoration: BoxDecoration(
+            border: Border.all(color: const Color(0xFF0A0A0A), width: 1),
+          ),
+          child: Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 180),
+              style: TextStyle(
+                fontSize: widget.isMobile ? 8 : 9,
+                fontWeight: FontWeight.w700,
+                color: _hovered ? Colors.white : const Color(0xFF0A0A0A),
+                letterSpacing: 1.5,
+              ),
+              child: const Text('ADD TO CART'),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Profile bottom sheet (unchanged logic, minor polish)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ProfileSheet extends StatefulWidget {
@@ -768,7 +1013,7 @@ class _ProfileSheet extends StatefulWidget {
 class _ProfileSheetState extends State<_ProfileSheet> {
   String? _email;
   Map<String, int> _counts = {};
-  String _role = SellerApplicationService.roleUser;
+  String _role      = SellerApplicationService.roleUser;
   String _riderRole = RiderApplicationService.roleUser;
 
   @override
@@ -788,14 +1033,14 @@ class _ProfileSheetState extends State<_ProfileSheet> {
     if (!mounted) return;
     final orders = results[0] as List;
     setState(() {
-      _email = email;
-      _role = results[1] as String;
-      _riderRole = results[2] as String;
+      _email      = email;
+      _role       = results[1] as String;
+      _riderRole  = results[2] as String;
       _counts = {
-        'purchased': orders.length,
-        Order.toPay:     orders.where((o) => o.status == Order.toPay).length,
-        Order.toShip:    orders.where((o) => o.status == Order.toShip).length,
-        Order.toReceive: orders.where((o) => o.status == Order.toReceive).length,
+        'purchased':      orders.length,
+        Order.toPay:      orders.where((o) => o.status == Order.toPay).length,
+        Order.toShip:     orders.where((o) => o.status == Order.toShip).length,
+        Order.toReceive:  orders.where((o) => o.status == Order.toReceive).length,
       };
     });
   }
@@ -813,8 +1058,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
   Future<void> _openRiderApplicationForm() async {
     Navigator.of(context).pop();
     final submitted = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-          builder: (_) => const RiderApplicationFormScreen()),
+      MaterialPageRoute(builder: (_) => const RiderApplicationFormScreen()),
     );
     if (submitted == true && mounted) {
       setState(() => _riderRole = RiderApplicationService.roleRider);
@@ -823,38 +1067,18 @@ class _ProfileSheetState extends State<_ProfileSheet> {
 
   Widget _buildSellerSection() {
     if (_role == SellerApplicationService.roleSeller) {
-      return GestureDetector(
+      return _SheetAction(
+        icon: Icons.storefront_outlined,
+        label: 'SELLER DASHBOARD',
+        dark: true,
         onTap: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SellerDashboardScreen()),
-          );
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const SellerDashboardScreen(),
+          ));
         },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: const Color(0xFF0A0A0A),
-          child: const Row(
-            children: [
-              Icon(Icons.storefront_outlined, size: 16, color: Colors.white),
-              SizedBox(width: 12),
-              Text(
-                'SELLER DASHBOARD',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                  color: Colors.white,
-                ),
-              ),
-              Spacer(),
-              Icon(Icons.arrow_forward_ios, size: 11, color: Color(0xFF888888)),
-            ],
-          ),
-        ),
       );
     }
-
     if (_role == SellerApplicationService.rolePending) {
       return Container(
         width: double.infinity,
@@ -862,30 +1086,20 @@ class _ProfileSheetState extends State<_ProfileSheet> {
         color: const Color(0xFFFFF8E1),
         child: const Row(
           children: [
-            Icon(Icons.hourglass_top_outlined,
-                size: 16, color: Color(0xFFB8860B)),
+            Icon(Icons.hourglass_top_outlined, size: 16, color: Color(0xFFB8860B)),
             SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'APPLICATION PENDING',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2,
-                      color: Color(0xFFB8860B),
-                    ),
-                  ),
+                  Text('APPLICATION PENDING',
+                      style: TextStyle(
+                        fontSize: 10, fontWeight: FontWeight.w700,
+                        letterSpacing: 2, color: Color(0xFFB8860B),
+                      )),
                   SizedBox(height: 3),
-                  Text(
-                    'Your seller application is under review.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF888888),
-                    ),
-                  ),
+                  Text('Your seller application is under review.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF888888))),
                 ],
               ),
             ),
@@ -893,105 +1107,37 @@ class _ProfileSheetState extends State<_ProfileSheet> {
         ),
       );
     }
-
-    // roleUser — show apply button
-    return GestureDetector(
+    return _SheetAction(
+      icon: Icons.storefront_outlined,
+      label: 'APPLY AS SELLER',
       onTap: _openApplicationForm,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        color: const Color(0xFFF6F6F6),
-        child: const Row(
-          children: [
-            Icon(Icons.storefront_outlined,
-                size: 16, color: Color(0xFF0A0A0A)),
-            SizedBox(width: 12),
-            Text(
-              'APPLY AS SELLER',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-                color: Color(0xFF0A0A0A),
-              ),
-            ),
-            Spacer(),
-            Icon(Icons.arrow_forward_ios,
-                size: 11, color: Color(0xFFAAAAAA)),
-          ],
-        ),
-      ),
     );
   }
 
   Widget _buildRiderSection() {
     if (_riderRole == RiderApplicationService.roleRider) {
-      return GestureDetector(
+      return _SheetAction(
+        icon: Icons.delivery_dining,
+        label: 'RIDER DASHBOARD',
+        dark: true,
         onTap: () {
           Navigator.of(context).pop();
-          Navigator.of(context).push(
-            MaterialPageRoute(
-                builder: (_) => const RiderDashboardScreen()),
-          );
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const RiderDashboardScreen(),
+          ));
         },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          color: const Color(0xFF1A1A2E),
-          child: const Row(
-            children: [
-              Icon(Icons.delivery_dining, size: 16, color: Colors.white),
-              SizedBox(width: 12),
-              Text(
-                'RIDER DASHBOARD',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                  color: Colors.white,
-                ),
-              ),
-              Spacer(),
-              Icon(Icons.arrow_forward_ios,
-                  size: 11, color: Color(0xFF888888)),
-            ],
-          ),
-        ),
       );
     }
-
-    // roleUser — show apply button
-    return GestureDetector(
+    return _SheetAction(
+      icon: Icons.delivery_dining,
+      label: 'APPLY AS RIDER',
       onTap: _openRiderApplicationForm,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        color: const Color(0xFFF6F6F6),
-        child: const Row(
-          children: [
-            Icon(Icons.delivery_dining, size: 16, color: Color(0xFF0A0A0A)),
-            SizedBox(width: 12),
-            Text(
-              'APPLY AS RIDER',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2,
-                color: Color(0xFF0A0A0A),
-              ),
-            ),
-            Spacer(),
-            Icon(Icons.arrow_forward_ios,
-                size: 11, color: Color(0xFFAAAAAA)),
-          ],
-        ),
-      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final initials = (_email != null && _email!.isNotEmpty)
+    final initials = (_email?.isNotEmpty == true)
         ? _email!.substring(0, 1).toUpperCase()
         : '?';
 
@@ -1007,31 +1153,24 @@ class _ProfileSheetState extends State<_ProfileSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Container(
             margin: const EdgeInsets.only(top: 14, bottom: 4),
-            width: 32,
-            height: 3,
+            width: 32, height: 3,
             decoration: BoxDecoration(
               color: const Color(0xFFDDDDDD),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 12, 20, 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'MY ACCOUNT',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 3,
-                    color: Color(0xFF0A0A0A),
-                  ),
-                ),
+                const Text('MY ACCOUNT',
+                    style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700,
+                      letterSpacing: 3, color: Color(0xFF0A0A0A),
+                    )),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.close, size: 18, color: Color(0xFF888888)),
@@ -1043,49 +1182,35 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           ),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // User info row
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 44, height: 44,
                   color: const Color(0xFF0A0A0A),
                   child: Center(
-                    child: Text(
-                      initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1,
-                      ),
-                    ),
+                    child: Text(initials,
+                        style: const TextStyle(
+                          color: Colors.white, fontSize: 16,
+                          fontWeight: FontWeight.w600, letterSpacing: 1,
+                        )),
                   ),
                 ),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'ACCOUNT',
-                      style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF999999),
-                        letterSpacing: 2,
-                      ),
-                    ),
+                    const Text('ACCOUNT',
+                        style: TextStyle(
+                          fontSize: 8, fontWeight: FontWeight.w600,
+                          color: Color(0xFF999999), letterSpacing: 2,
+                        )),
                     const SizedBox(height: 4),
-                    Text(
-                      _email ?? '—',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF0A0A0A),
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
+                    Text(_email ?? '—',
+                        style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF0A0A0A),
+                        )),
                   ],
                 ),
               ],
@@ -1093,105 +1218,62 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           ),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // Order status
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ORDER STATUS',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A0A0A),
-                    letterSpacing: 3,
-                  ),
-                ),
+                const Text('ORDER STATUS',
+                    style: TextStyle(
+                      fontSize: 9, fontWeight: FontWeight.w700,
+                      color: Color(0xFF0A0A0A), letterSpacing: 3,
+                    )),
                 const SizedBox(height: 10),
                 Container(width: 24, height: 1, color: const Color(0xFF0A0A0A)),
                 const SizedBox(height: 24),
                 Row(
-                  children: orderItems.map((item) {
-                    return Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            item['count'] as String,
+                  children: orderItems.map((item) => Expanded(
+                    child: Column(
+                      children: [
+                        Text(item['count'] as String,
                             style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w300,
+                              fontSize: 22, fontWeight: FontWeight.w300,
                               color: Color(0xFF0A0A0A),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Icon(
-                            item['icon'] as IconData,
-                            size: 20,
-                            color: const Color(0xFF0A0A0A),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            item['label'] as String,
+                            )),
+                        const SizedBox(height: 8),
+                        Icon(item['icon'] as IconData, size: 20, color: const Color(0xFF0A0A0A)),
+                        const SizedBox(height: 8),
+                        Text(item['label'] as String,
                             style: const TextStyle(
-                              fontSize: 7,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF888888),
-                              letterSpacing: 1,
+                              fontSize: 7, fontWeight: FontWeight.w600,
+                              color: Color(0xFF888888), letterSpacing: 1,
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                            textAlign: TextAlign.center),
+                      ],
+                    ),
+                  )).toList(),
                 ),
               ],
             ),
           ),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // View orders link
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
-            child: GestureDetector(
+            child: _SheetAction(
+              icon: Icons.receipt_long_outlined,
+              label: 'VIEW ALL ORDERS',
               onTap: () {
                 Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const BuyerOrdersScreen()),
-                );
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const BuyerOrdersScreen(),
+                ));
               },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                color: const Color(0xFFF6F6F6),
-                child: const Row(
-                  children: [
-                    Icon(Icons.receipt_long_outlined,
-                        size: 16, color: Color(0xFF0A0A0A)),
-                    SizedBox(width: 12),
-                    Text(
-                      'VIEW ALL ORDERS',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                        color: Color(0xFF0A0A0A),
-                      ),
-                    ),
-                    Spacer(),
-                    Icon(Icons.arrow_forward_ios,
-                        size: 11, color: Color(0xFFAAAAAA)),
-                  ],
-                ),
-              ),
             ),
           ),
           const SizedBox(height: 16),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // Seller section
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
             child: _buildSellerSection(),
@@ -1199,7 +1281,6 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           const SizedBox(height: 16),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // Rider section
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 16, 28, 0),
             child: _buildRiderSection(),
@@ -1207,7 +1288,6 @@ class _ProfileSheetState extends State<_ProfileSheet> {
           const SizedBox(height: 16),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
 
-          // Sign out
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
             child: SizedBox(
@@ -1220,23 +1300,75 @@ class _ProfileSheetState extends State<_ProfileSheet> {
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFF0A0A0A), width: 1),
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.zero,
-                  ),
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
                 ),
-                child: const Text(
-                  'SIGN OUT',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 2.5,
-                    color: Color(0xFF0A0A0A),
-                  ),
-                ),
+                child: const Text('SIGN OUT',
+                    style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.w700,
+                      letterSpacing: 2.5, color: Color(0xFF0A0A0A),
+                    )),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SheetAction extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool dark;
+  final VoidCallback onTap;
+
+  const _SheetAction({
+    required this.icon,
+    required this.label,
+    this.dark = false,
+    required this.onTap,
+  });
+
+  @override
+  State<_SheetAction> createState() => _SheetActionState();
+}
+
+class _SheetActionState extends State<_SheetAction> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = widget.dark
+        ? (_hovered ? const Color(0xFF222222) : const Color(0xFF0A0A0A))
+        : (_hovered ? const Color(0xFFEEEEEE) : const Color(0xFFF6F6F6));
+    final fg = widget.dark ? Colors.white : const Color(0xFF0A0A0A);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          color: bg,
+          child: Row(
+            children: [
+              Icon(widget.icon, size: 16, color: fg),
+              const SizedBox(width: 12),
+              Text(widget.label,
+                  style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w700,
+                    letterSpacing: 2, color: fg,
+                  )),
+              const Spacer(),
+              Icon(Icons.arrow_forward_ios, size: 11,
+                  color: widget.dark ? const Color(0xFF888888) : const Color(0xFFAAAAAA)),
+            ],
+          ),
+        ),
       ),
     );
   }

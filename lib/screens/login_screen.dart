@@ -12,8 +12,13 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   static final RegExp _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+  late final AnimationController _ctrl;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
 
   bool isLogin = true;
   bool loading = false;
@@ -41,7 +46,29 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscureConfirm = true;
 
   @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    _fade = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+    );
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
+    ));
+    _ctrl.forward();
+  }
+
+  @override
   void dispose() {
+    _ctrl.dispose();
     emailCtrl.dispose();
     passCtrl.dispose();
     firstCtrl.dispose();
@@ -190,15 +217,19 @@ class _LoginScreenState extends State<LoginScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F6F6),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 24 : 0,
-            vertical: 48,
-          ),
-          child: SizedBox(
-            width: 420,
-            child: Column(
+      body: FadeTransition(
+        opacity: _fade,
+        child: SlideTransition(
+          position: _slide,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 24 : 0,
+                vertical: 48,
+              ),
+              child: SizedBox(
+                width: 420,
+                child: Column(
               children: [
                 const Text(
                   'VARÓN',
@@ -282,7 +313,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-              ],
+                ],
+                ),
+              ),
             ),
           ),
         ),

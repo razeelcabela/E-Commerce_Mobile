@@ -109,7 +109,8 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
-    Navigator.of(context).pushReplacementNamed('/home');
+    // Navigate to auth loading screen to determine user role
+    Navigator.of(context).pushReplacementNamed('/auth-loading');
   }
 
   Future<void> signup() async {
@@ -290,22 +291,6 @@ class _LoginScreenState extends State<LoginScreen>
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 2.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Center(
-                        child: GestureDetector(
-                          onTap: () =>
-                              Navigator.of(context).pushReplacementNamed('/select-role'),
-                          child: const Text(
-                            '← Back to portal selection',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF888888),
-                              decoration: TextDecoration.underline,
-                              decorationColor: Color(0xFF888888),
                             ),
                           ),
                         ),

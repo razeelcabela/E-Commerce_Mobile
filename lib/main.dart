@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
+import 'config/supabase_diagnostic.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/role_selection_screen.dart';
@@ -18,35 +19,66 @@ import 'services/rider_auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (!kIsWeb) {
-    try {
-      await dotenv.load(fileName: '.env');
-      debugPrint('✅ .env file loaded successfully');
-    } catch (e) {
-      debugPrint('⚠️ Warning: Could not load .env file: $e');
-    }
-  } else {
-    debugPrint('ℹ️ Running on Flutter Web - using dart-define Supabase config');
+  // STEP 1: Always try to load .env (works on all platforms)
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('✅ .env file loaded successfully');
+  } catch (e) {
+    debugPrint('⚠️ .env file not found or error loading: $e');
   }
 
-  // Check if Supabase is configured
+  // STEP 2: Show platform info
+  debugPrint('Platform: ${kIsWeb ? '🌐 WEB' : '📱 NATIVE'}');
+
+  // STEP 3: Get and validate Supabase credentials
+  debugPrint('\n=== CHECKING SUPABASE CREDENTIALS ===');
   SupabaseConfig.debugPrintConfig();
-  
-  if (!SupabaseConfig.isConfigured()) {
-    debugPrint('❌ ERROR: Supabase credentials are not configured!');
-    if (!kIsWeb) {
-      debugPrint('   Create a .env file in the project root');
-      debugPrint('   Add SUPABASE_URL and SUPABASE_ANON_KEY');
+
+  final url = SupabaseConfig.supabaseUrl;
+  final key = SupabaseConfig.supabaseAnonKey;
+
+  if (url.isEmpty || key.isEmpty) {
+    debugPrint('\n❌ CRITICAL ERROR: Supabase credentials are empty!');
+    debugPrint('\n📋 HOW TO FIX:');
+    if (kIsWeb) {
+      debugPrint('For Flutter Web, you have two options:\n');
+      debugPrint('OPTION 1: Use --dart-define flags (recommended for production)');
+      debugPrint('  flutter run -d chrome \\');
+      debugPrint('    --dart-define=SUPABASE_URL=https://YOUR_PROJECT.supabase.co \\');
+      debugPrint('    --dart-define=SUPABASE_ANON_KEY=YOUR_ANON_KEY\n');
+      debugPrint('OPTION 2: Use .env file (for development, requires web_entrypoint)');
+      debugPrint('  1. Make sure .env exists in project root');
+      debugPrint('  2. Verify pubspec.yaml has: assets: [.env]');
+      debugPrint('  3. Run: flutter run -d chrome');
     } else {
-      debugPrint('   For web, set environment variables during build:');
-      debugPrint('   flutter run -d chrome --dart-define=SUPABASE_URL=xxx --dart-define=SUPABASE_ANON_KEY=xxx');
+      debugPrint('For Flutter Native:\n');
+      debugPrint('1. Create .env file in project root:');
+      debugPrint('   SUPABASE_URL=https://YOUR_PROJECT.supabase.co');
+      debugPrint('   SUPABASE_ANON_KEY=YOUR_ANON_KEY\n');
+      debugPrint('2. Verify pubspec.yaml has: assets: [.env]\n');
+      debugPrint('3. Run: flutter run');
     }
+    throw Exception('Supabase credentials not configured!');
   }
 
-  await Supabase.initialize(
-    url: SupabaseConfig.supabaseUrl,
-    anonKey: SupabaseConfig.supabaseAnonKey,
-  );
+  debugPrint('\n✅ Credentials loaded successfully');
+
+  // STEP 4: Initialize Supabase
+  debugPrint('\n=== INITIALIZING SUPABASE ===');
+  try {
+    await Supabase.initialize(
+      url: url,
+      anonKey: key,
+    );
+    debugPrint('✅ Supabase initialized successfully');
+  } catch (e) {
+    debugPrint('❌ Supabase initialization error: $e');
+    rethrow;
+  }
+
+  // STEP 5: Run diagnostics
+  debugPrint('\n📡 Running Supabase Connectivity Diagnostics...\n');
+  await SupabaseDiagnostic.runAllDiagnostics(url, key);
 
   runApp(const MyApp());
 }

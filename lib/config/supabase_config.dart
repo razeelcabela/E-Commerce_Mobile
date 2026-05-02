@@ -2,44 +2,55 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class SupabaseConfig {
-  static const String _webSupabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  static const String _webSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  // For web: try dart-define first
+  static const String _webSupabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  static const String _webSupabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
 
-  /// Reads Supabase credentials from multiple sources:
-  /// 1. Dart define values (works on web and native)
-  /// 2. .env file on non-web platforms
-  /// 3. Returns empty string if not found
+  /// Reads Supabase credentials from multiple sources (in priority order):
+  /// 1. Dart define values via --dart-define (best for web/deployment)
+  /// 2. dotenv.env (works if dotenv is loaded first - all platforms)
+  /// 3. Empty string if not found (will trigger error message)
   static String get supabaseUrl {
+    // Try dart-define first (web and native)
     if (_webSupabaseUrl.isNotEmpty) {
+      debugPrint('✅ supabaseUrl loaded from dart-define');
       return _webSupabaseUrl;
     }
 
+    // Try dotenv (all platforms after dotenv.load is called)
     try {
       final fromDotenv = dotenv.env['SUPABASE_URL'];
       if (fromDotenv != null && fromDotenv.isNotEmpty) {
+        debugPrint('✅ supabaseUrl loaded from dotenv');
         return fromDotenv;
       }
-    } catch (_) {
-      // dotenv not initialized yet or unavailable; fall through to empty string.
+    } catch (e) {
+      debugPrint('⚠️ dotenv not ready yet or error: $e');
     }
 
+    debugPrint('❌ supabaseUrl NOT FOUND - check .env file or use --dart-define');
     return '';
   }
 
   static String get supabaseAnonKey {
+    // Try dart-define first (web and native)
     if (_webSupabaseAnonKey.isNotEmpty) {
+      debugPrint('✅ supabaseAnonKey loaded from dart-define');
       return _webSupabaseAnonKey;
     }
 
+    // Try dotenv (all platforms after dotenv.load is called)
     try {
       final fromDotenv = dotenv.env['SUPABASE_ANON_KEY'];
       if (fromDotenv != null && fromDotenv.isNotEmpty) {
+        debugPrint('✅ supabaseAnonKey loaded from dotenv');
         return fromDotenv;
       }
-    } catch (_) {
-      // dotenv not initialized yet or unavailable; fall through to empty string.
+    } catch (e) {
+      debugPrint('⚠️ dotenv not ready yet or error: $e');
     }
 
+    debugPrint('❌ supabaseAnonKey NOT FOUND - check .env file or use --dart-define');
     return '';
   }
 

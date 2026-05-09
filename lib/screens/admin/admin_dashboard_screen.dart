@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/admin_service.dart';
 import '../../services/unified_auth_service.dart';
 
@@ -784,22 +785,297 @@ class _ProductsTab extends StatefulWidget {
 class _ProductsTabState extends State<_ProductsTab> {
   List<Map<String, dynamic>> _products = [];
   bool _loading = true;
-  String? _filter;
+  String _filter = 'pending';
 
-  final _filterOptions = ['All', 'pending', 'approved', 'rejected'];
+  final _filterOptions = ['pending', 'approved', 'rejected', 'All'];
 
   @override
   void initState() {
     super.initState();
-    _filter = 'pending';
     _load();
   }
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    _products = await AdminService.getProducts(approvalFilter: _filter == 'All' ? null : _filter);
+    _products = await AdminService.getProducts(
+      approvalFilter: _filter == 'All' ? null : _filter,
+    );
     if (mounted) setState(() => _loading = false);
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  String _resolveImageUrl(dynamic images) {
+    if (images == null) return '';
+    final list = images as List;
+    if (list.isEmpty) return '';
+    final raw = list.first['image_url'] as String? ?? '';
+    if (raw.isEmpty) return '';
+    if (raw.startsWith('http')) return raw;
+    try {
+      final filename = raw.contains('/') ? raw.split('/').last : raw;
+      return Supabase.instance.client.storage
+          .from('products')
+          .getPublicUrl(filename);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return '—';
+    final dt = DateTime.tryParse(iso)?.toLocal();
+    if (dt == null) return '—';
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+  }
+
+  // ── Reject dialog ─────────────────────────────────────────────────────────
+
+  Future<String?> _showRejectDialog(String productName) async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        title: const Text('Reject Product',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('"$productName"',
+                style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF555555),
+                    fontStyle: FontStyle.italic)),
+            const SizedBox(height: 16),
+            const Text('Rejection reason (required):',
+                style: TextStyle(fontSize: 12, color: Color(0xFF888888))),
+            const SizedBox(height: 8),
+            TextField(
+              controller: ctrl,
+              maxLines: 3,
+              autofocus: true,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'e.g. Images are unclear, price is too high…',
+                hintStyle: const TextStyle(
+                    fontSize: 13, color: Color(0xFFBBBBBB)),
+                filled: true,
+                fillColor: const Color(0xFFF7F6F4),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF0A0A0A), width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel',
+                style: TextStyle(color: Color(0xFF888888))),
+          ),
+          TextButton(
+            onPressed: () {
+              final reason = ctrl.text.trim();
+              if (reason.isEmpty) return;
+              Navigator.of(ctx).pop(reason);
+            },
+            child: const Text('Reject',
+                style: TextStyle(
+                    color: Color(0xFFDC2626), fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Product detail dialog ─────────────────────────────────────────────────
+
+  void _showDetails(Map<String, dynamic> p) {
+    final seller = p['sellers'] as Map<String, dynamic>?;
+    final category = p['categories'] as Map<String, dynamic>?;
+    final imageUrl = _resolveImageUrl(p['product_images']);
+    final status = p['approval_status'] as String? ?? 'pending';
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Image
+              if (imageUrl.isNotEmpty)
+                Image.network(imageUrl,
+                    width: double.infinity,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                        height: 200,
+                        color: const Color(0xFFF0F0F0),
+                        child: const Icon(Icons.inventory_2_outlined,
+                            size: 48, color: Color(0xFFCCCCCC))))
+              else
+                Container(
+                    height: 120,
+                    color: const Color(0xFFF0F0F0),
+                    child: const Center(
+                        child: Icon(Icons.inventory_2_outlined,
+                            size: 48, color: Color(0xFFCCCCCC)))),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(p['name'] ?? '',
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.w700)),
+                        ),
+                        _statusBadge(
+                          status.toUpperCase(),
+                          _statusColor(status).withValues(alpha: 0.12),
+                          _statusColor(status),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    _detailRow('Seller', seller?['store_name'] ?? '—'),
+                    _detailRow('Category', category?['name'] ?? '—'),
+                    _detailRow('Price',
+                        '₱${((p['price'] as num?)?.toStringAsFixed(2)) ?? '0.00'}'),
+                    _detailRow('Stock', '${p['stock'] ?? 0} units'),
+                    _detailRow('Condition',
+                        _capitalize(p['condition'] as String? ?? 'new')),
+                    _detailRow('Delivery',
+                        _capitalize(p['delivery_options'] as String? ?? 'delivery')),
+                    _detailRow('Submitted', _formatDate(p['created_at'] as String?)),
+                    if ((p['rejection_reason'] as String?)?.isNotEmpty == true)
+                      _detailRow('Rejection reason', p['rejection_reason'] as String,
+                          valueColor: const Color(0xFFDC2626)),
+                    const SizedBox(height: 12),
+                    const Text('DESCRIPTION',
+                        style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
+                            color: Color(0xFF888888))),
+                    const SizedBox(height: 6),
+                    Text(
+                      (p['description'] as String?)?.isNotEmpty == true
+                          ? p['description'] as String
+                          : 'No description provided.',
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF444444), height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF0A0A0A),
+                    minimumSize: const Size(double.infinity, 44),
+                    backgroundColor: const Color(0xFFF0F0F0),
+                    shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero),
+                  ),
+                  child: const Text('CLOSE',
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF888888),
+                    fontWeight: FontWeight.w500)),
+          ),
+          Expanded(
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: valueColor ?? const Color(0xFF0A0A0A))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  Future<void> _approve(Map<String, dynamic> product) async {
+    setState(() => _loading = true);
+    final err = await AdminService.approveProduct(product['id'] as int);
+    if (mounted) {
+      if (err != null) {
+        setState(() => _loading = false);
+        _snack(context, 'Error: $err', error: true);
+      } else {
+        _snack(context, '✓ "${product['name']}" approved and now live');
+        _load();
+      }
+    }
+  }
+
+  Future<void> _reject(Map<String, dynamic> product) async {
+    final reason = await _showRejectDialog(product['name'] as String? ?? '');
+    if (reason == null || !mounted) return;
+    setState(() => _loading = true);
+    final err = await AdminService.rejectProduct(product['id'] as int, reason);
+    if (mounted) {
+      if (err != null) {
+        setState(() => _loading = false);
+        _snack(context, 'Error: $err', error: true);
+      } else {
+        _snack(context, '✗ "${product['name']}" rejected');
+        _load();
+      }
+    }
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -808,7 +1084,7 @@ class _ProductsTabState extends State<_ProductsTab> {
       appBar: const _AdminAppBar(title: 'Products'),
       body: Column(
         children: [
-          // Filter chips
+          // Filter bar
           Container(
             color: Colors.white,
             height: 48,
@@ -819,71 +1095,92 @@ class _ProductsTabState extends State<_ProductsTab> {
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (_, i) {
                 final f = _filterOptions[i];
-                final selected = (_filter ?? 'pending') == f;
+                final selected = _filter == f;
+                Color? accent;
+                if (f == 'pending') accent = const Color(0xFFF59E0B);
+                if (f == 'approved') accent = const Color(0xFF16A34A);
+                if (f == 'rejected') accent = const Color(0xFFDC2626);
                 return GestureDetector(
-                  onTap: () { setState(() => _filter = f); _load(); },
+                  onTap: () {
+                    setState(() => _filter = f);
+                    _load();
+                  },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     decoration: BoxDecoration(
-                      color: selected ? const Color(0xFF0A0A0A) : const Color(0xFFF0F0F0),
+                      color: selected
+                          ? (accent ?? const Color(0xFF0A0A0A))
+                          : const Color(0xFFF0F0F0),
                       borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Text(f.toUpperCase(), style: TextStyle(
-                      color: selected ? Colors.white : const Color(0xFF444444),
-                      fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5,
-                    )),
+                    child: Text(
+                      f.toUpperCase(),
+                      style: TextStyle(
+                        color: selected ? Colors.white : const Color(0xFF666666),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ),
                 );
               },
             ),
           ),
+          // Count bar for pending
+          if (_filter == 'pending' && !_loading)
+            Container(
+              color: _products.isEmpty
+                  ? const Color(0xFFF6F6F6)
+                  : const Color(0xFFFFF7ED),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    _products.isEmpty
+                        ? Icons.check_circle_outline
+                        : Icons.pending_outlined,
+                    size: 14,
+                    color: _products.isEmpty
+                        ? const Color(0xFF16A34A)
+                        : const Color(0xFFF59E0B),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _products.isEmpty
+                        ? 'No pending products to review'
+                        : '${_products.length} product${_products.length == 1 ? '' : 's'} awaiting review',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _products.isEmpty
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFF59E0B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF0A0A0A), strokeWidth: 2))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                        color: Color(0xFF0A0A0A), strokeWidth: 2))
                 : _products.isEmpty
-                    ? Center(child: Text('No ${_filter ?? ''} products.', style: const TextStyle(color: Color(0xFF888888))))
+                    ? _emptyState()
                     : RefreshIndicator(
                         onRefresh: _load,
                         color: const Color(0xFF0A0A0A),
                         child: ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: _products.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
-                          itemBuilder: (_, i) {
-                            final p = _products[i];
-                            final seller = p['sellers'] as Map<String, dynamic>?;
-                            final status = p['approval_status'] as String? ?? 'pending';
-                            return Container(
-                              color: Colors.white,
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                leading: Container(
-                                  width: 44, height: 44,
-                                  color: const Color(0xFFF0F0F0),
-                                  child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF888888), size: 20),
-                                ),
-                                title: Text(p['name'] ?? 'Unknown Product',
-                                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (seller != null)
-                                      Text('${seller['store_name'] ?? ''}',
-                                          style: const TextStyle(fontSize: 11, color: Color(0xFF888888))),
-                                    Text('₱${((p['price'] as num?)?.toStringAsFixed(2)) ?? '0.00'}',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                                trailing: _statusBadge(
-                                  status.toUpperCase(),
-                                  _statusColor(status).withValues(alpha:0.12),
-                                  _statusColor(status),
-                                ),
-                                onTap: () => _showProductActions(p),
-                              ),
-                            );
-                          },
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 12),
+                          itemBuilder: (_, i) => _filter == 'pending'
+                              ? _pendingCard(_products[i])
+                              : _standardCard(_products[i]),
                         ),
                       ),
           ),
@@ -892,50 +1189,338 @@ class _ProductsTabState extends State<_ProductsTab> {
     );
   }
 
-  void _showProductActions(Map<String, dynamic> product) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text(product['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('Choose action:'),
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            color: const Color(0xFFF0F0F0),
+            child: Icon(
+              _filter == 'pending'
+                  ? Icons.task_alt
+                  : Icons.inventory_2_outlined,
+              size: 32,
+              color: _filter == 'pending'
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFFCCCCCC),
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.check_circle_outline, color: Color(0xFF16A34A)),
-              title: const Text('Approve Product'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _setApproval(product['id'] as int, 'approved');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626)),
-              title: const Text('Reject Product'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _setApproval(product['id'] as int, 'rejected');
-              },
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _filter == 'pending'
+                ? 'No pending products to review'
+                : 'No $_filter products.',
+            style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF888888),
+                fontWeight: FontWeight.w500),
+          ),
+        ],
       ),
     );
   }
 
-  Future<void> _setApproval(int id, String status) async {
-    final err = await AdminService.setProductApproval(id, status);
-    if (mounted) {
-      if (err != null) {
-        _snack(context, 'Error: $err', error: true);
-      } else {
-        _snack(context, 'Product $status');
-        _load();
-      }
-    }
+  // ── Pending product card (rich) ───────────────────────────────────────────
+
+  Widget _pendingCard(Map<String, dynamic> p) {
+    final seller = p['sellers'] as Map<String, dynamic>?;
+    final category = p['categories'] as Map<String, dynamic>?;
+    final imageUrl = _resolveImageUrl(p['product_images']);
+    final price = (p['price'] as num?)?.toStringAsFixed(2) ?? '0.00';
+    final stock = p['stock'] as int? ?? 0;
+    final desc = p['description'] as String? ?? '';
+    final date = _formatDate(p['created_at'] as String?);
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header row: image + core info ──────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    color: const Color(0xFFF0F0F0),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.image_outlined,
+                                size: 28,
+                                color: Color(0xFFCCCCCC)))
+                        : const Icon(Icons.image_outlined,
+                            size: 28, color: Color(0xFFCCCCCC)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p['name'] ?? 'Unknown Product',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF0A0A0A)),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      if (seller != null)
+                        Text(
+                          seller['store_name'] ?? '',
+                          style: const TextStyle(
+                              fontSize: 11, color: Color(0xFF888888)),
+                        ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          if (category != null)
+                            _chip(category['name'] as String? ?? '',
+                                const Color(0xFF3B82F6)),
+                          _chip('₱$price', const Color(0xFF0A0A0A)),
+                          _chip('Stock: $stock',
+                              stock > 0
+                                  ? const Color(0xFF16A34A)
+                                  : const Color(0xFFDC2626)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Submitted $date',
+                        style: const TextStyle(
+                            fontSize: 10, color: Color(0xFFAAAAAA)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Description ────────────────────────────────────────────────
+          if (desc.isNotEmpty) ...[
+            const Divider(height: 1, color: Color(0xFFF2F2F2)),
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('DESCRIPTION',
+                      style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 2,
+                          color: Color(0xFF999999))),
+                  const SizedBox(height: 6),
+                  Text(
+                    desc,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF555555),
+                        height: 1.5),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // ── Action buttons ─────────────────────────────────────────────
+          const Divider(height: 1, color: Color(0xFFF2F2F2)),
+          Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                // View Details
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _showDetails(p),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0A0A0A),
+                      side: const BorderSide(color: Color(0xFFDDDDDD)),
+                      shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: const Text('VIEW DETAILS',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Reject
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => _reject(p),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFDC2626),
+                      side: const BorderSide(color: Color(0xFFDC2626)),
+                      shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: const Text('REJECT',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Approve
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _approve(p),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.zero),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: const Text('APPROVE',
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontSize: 10, fontWeight: FontWeight.w700, color: color),
+      ),
+    );
+  }
+
+  // ── Standard list card (approved / rejected / All) ────────────────────────
+
+  Widget _standardCard(Map<String, dynamic> p) {
+    final seller = p['sellers'] as Map<String, dynamic>?;
+    final category = p['categories'] as Map<String, dynamic>?;
+    final imageUrl = _resolveImageUrl(p['product_images']);
+    final status = p['approval_status'] as String? ?? '';
+    final rejReason = p['rejection_reason'] as String?;
+
+    return Container(
+      color: Colors.white,
+      child: InkWell(
+        onTap: () => _showDetails(p),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  color: const Color(0xFFF0F0F0),
+                  child: imageUrl.isNotEmpty
+                      ? Image.network(imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 22,
+                              color: Color(0xFFCCCCCC)))
+                      : const Icon(Icons.inventory_2_outlined,
+                          size: 22, color: Color(0xFFCCCCCC)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p['name'] ?? '',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0A0A0A)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${seller?['store_name'] ?? ''}'
+                      '${category?['name'] != null ? ' · ${category!['name']}' : ''}',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF888888)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (status == 'rejected' &&
+                        rejReason != null &&
+                        rejReason.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Reason: $rejReason',
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFFDC2626)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      '₱${((p['price'] as num?)?.toStringAsFixed(2)) ?? '0.00'}  ·  Stock: ${p['stock'] ?? 0}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF0A0A0A)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _statusBadge(
+                status.toUpperCase(),
+                _statusColor(status).withValues(alpha: 0.12),
+                _statusColor(status),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

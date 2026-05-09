@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
 
 class AdminService {
   static SupabaseClient get _db => Supabase.instance.client;
@@ -185,8 +186,11 @@ class AdminService {
   static Future<List<Map<String, dynamic>>> getProducts({String? approvalFilter}) async {
     try {
       var query = _db.from('products').select(
-        'id, name, price, approval_status, is_active, archive_status, created_at, '
-        'sellers(store_name)',
+        'id, name, description, price, stock, approval_status, rejection_reason, '
+        'delivery_options, condition, is_active, archive_status, created_at, category_id, '
+        'sellers(id, store_name), '
+        'categories(name), '
+        'product_images(image_url)',
       );
       if (approvalFilter != null) {
         query = query.eq('approval_status', approvalFilter);
@@ -199,16 +203,62 @@ class AdminService {
     }
   }
 
-  static Future<String?> setProductApproval(int productId, String status) async {
+  static Future<String?> approveProduct(int productId) async {
     try {
-      await _db
+      final row = await _db
           .from('products')
-          .update({'approval_status': status})
-          .eq('id', productId);
+          .select('name, seller_id')
+          .eq('id', productId)
+          .single();
+
+      await _db.from('products').update({
+        'approval_status': 'approved',
+        'rejection_reason': null,
+        'is_active': 1,
+      }).eq('id', productId);
+
+      await NotificationService.notifyProductApproved(
+        sellerId: row['seller_id'] as int,
+        productId: productId,
+        productName: row['name'] as String,
+      );
       return null;
     } catch (e) {
-      developer.log('[AdminService.setProductApproval] Error: $e');
+      developer.log('[AdminService.approveProduct] Error: $e');
       return e.toString();
     }
+  }
+
+  static Future<String?> rejectProduct(int productId, String reason) async {
+    try {
+      final row = await _db
+          .from('products')
+          .select('name, seller_id')
+          .eq('id', productId)
+          .single();
+
+      await _db.from('products').update({
+        'approval_status': 'rejected',
+        'rejection_reason': reason,
+        'is_active': 0,
+      }).eq('id', productId);
+
+      await NotificationService.notifyProductRejected(
+        sellerId: row['seller_id'] as int,
+        productId: productId,
+        productName: row['name'] as String,
+        reason: reason,
+      );
+      return null;
+    } catch (e) {
+      developer.log('[AdminService.rejectProduct] Error: $e');
+      return e.toString();
+    }
+  }
+
+  // Kept for backward compatibility.
+  static Future<String?> setProductApproval(int productId, String status) async {
+    if (status == 'approved') return approveProduct(productId);
+    return rejectProduct(productId, 'No reason provided');
   }
 }

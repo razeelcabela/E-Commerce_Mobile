@@ -37,6 +37,10 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
   int? _selectedCategoryId;
   String _selectedCategoryName = '';
 
+  // Delivery options and condition
+  String _deliveryOptions = 'delivery';
+  String _condition = 'new';
+
   bool get _isEdit => widget.existing != null;
 
   @override
@@ -51,6 +55,8 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
       _existingImageUrl = p.imageUrl;
       _selectedCategoryId = p.categoryId;
       _selectedCategoryName = p.category;
+      _deliveryOptions = p.deliveryOptions;
+      _condition = p.condition;
     }
     _loadCategories();
   }
@@ -136,15 +142,26 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
         categoryId: _selectedCategoryId,
         category: _selectedCategoryName,
         createdAt: DateTime.now(),
+        deliveryOptions: _deliveryOptions,
+        condition: _condition,
       );
       final newId = await SellerProductService.add(product);
-      if (newId != null && _pickedBytes != null) {
+      if (!mounted) return;
+      if (newId == null) {
+        setState(() => _saving = false);
+        _snack('Failed to submit product. Please check your connection and try again.');
+        return;
+      }
+      if (_pickedBytes != null) {
         await SellerProductService.uploadImage(newId, _pickedBytes!, _pickedExt);
       }
     }
 
     if (!mounted) return;
     setState(() => _saving = false);
+    _snack(_isEdit ? 'Product updated.' : 'Product submitted for review!');
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
@@ -203,6 +220,37 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
                   _field('Description', _descCtrl, maxLines: 3),
                   const SizedBox(height: 16),
                   _categoryPicker(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('FULFILLMENT'),
+                  const SizedBox(height: 14),
+                  _optionPicker(
+                    label: 'DELIVERY OPTIONS',
+                    options: const [
+                      ('delivery', 'Delivery'),
+                      ('pickup', 'Pickup'),
+                      ('both', 'Delivery & Pickup'),
+                    ],
+                    selected: _deliveryOptions,
+                    onSelect: (v) => setState(() => _deliveryOptions = v),
+                  ),
+                  const SizedBox(height: 16),
+                  _optionPicker(
+                    label: 'CONDITION',
+                    options: const [
+                      ('new', 'New'),
+                      ('used', 'Used'),
+                      ('refurbished', 'Refurbished'),
+                    ],
+                    selected: _condition,
+                    onSelect: (v) => setState(() => _condition = v),
+                  ),
                 ],
               ),
             ),
@@ -432,6 +480,63 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
                   );
                 }).toList(),
               ),
+      ],
+    );
+  }
+
+  // ── Option picker (delivery / condition) ──────────────────────────────────
+
+  Widget _optionPicker({
+    required String label,
+    required List<(String value, String display)> options,
+    required String selected,
+    required void Function(String) onSelect,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.commissioner(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF888888),
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: options.map((opt) {
+            final isSelected = selected == opt.$1;
+            return GestureDetector(
+              onTap: () => onSelect(opt.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFF0A0A0A)
+                      : const Color(0xFFF5F4F2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  opt.$2,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected
+                        ? Colors.white
+                        : const Color(0xFF555555),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ],
     );
   }

@@ -1,7 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SellerProduct {
-  final dynamic id; // int from Supabase
+  final dynamic id;
   final int sellerId;
   final String sellerEmail;
   String name;
@@ -12,6 +12,10 @@ class SellerProduct {
   int? categoryId;
   String category;
   final DateTime createdAt;
+  String approvalStatus;
+  String? rejectionReason;
+  String deliveryOptions;
+  String condition;
 
   SellerProduct({
     required this.id,
@@ -25,10 +29,12 @@ class SellerProduct {
     this.categoryId,
     required this.category,
     required this.createdAt,
+    this.approvalStatus = 'pending',
+    this.rejectionReason,
+    this.deliveryOptions = 'delivery',
+    this.condition = 'new',
   });
 
-  /// Parse a Supabase products row.
-  /// Expects `image_url` and `category` to be injected by the service layer.
   factory SellerProduct.fromSupabase(Map<String, dynamic> json) {
     return SellerProduct(
       id: json['id'],
@@ -44,6 +50,10 @@ class SellerProduct {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : DateTime.now(),
+      approvalStatus: json['approval_status'] as String? ?? 'pending',
+      rejectionReason: json['rejection_reason'] as String?,
+      deliveryOptions: json['delivery_options'] as String? ?? 'delivery',
+      condition: json['condition'] as String? ?? 'new',
     );
   }
 

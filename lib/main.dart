@@ -14,6 +14,7 @@ import 'screens/shop_screen.dart';
 import 'screens/unauthorized_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/seller/seller_dashboard_screen.dart';
+import 'screens/seller/seller_notifications_screen.dart';
 import 'screens/rider/rider_dashboard_screen.dart';
 
 void main() async {
@@ -104,8 +105,9 @@ class MyApp extends StatelessWidget {
         '/home':              (context) => const HomeScreen(),
         '/shop':              (context) => const ShopScreen(),
         '/admin/dashboard':   (context) => const AdminDashboardScreen(),
-        '/seller/dashboard':  (context) => const SellerDashboardScreen(),
-        '/rider/dashboard':   (context) => const RiderDashboardScreen(),
+        '/seller/dashboard':       (context) => const SellerDashboardScreen(),
+        '/seller/notifications':   (context) => const SellerNotificationsScreen(),
+        '/rider/dashboard':        (context) => const RiderDashboardScreen(),
         '/unauthorized':      (context) => const UnauthorizedScreen(),
         '/pending':           (context) => const PendingApprovalScreen(),
         // Legacy aliases — redirect to unified login

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/rider_auth_service.dart';
@@ -76,16 +77,25 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
         return;
       }
 
+      // Admin dashboard is web-only — block admin accounts on mobile
+      if (role == UserRole.admin && !kIsWeb) {
+        await UnifiedAuthService.logout();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed(
+          '/unauthorized',
+          arguments: 'Admin access is only available on the web dashboard.\nPlease use a web browser to access the admin panel.',
+        );
+        return;
+      }
+
       // Sync role-specific session keys and check approval status
       if (role == UserRole.seller) {
         final status = await SellerAuthService.syncSession();
         if (!mounted) return;
         if (status == null) {
-          // Seller profile missing — treat as unauthorized
-          Navigator.of(context).pushReplacementNamed(
-            '/unauthorized',
-            arguments: 'No seller profile found for this account.',
-          );
+          // syncSession returns null ONLY when there is no Supabase session at all.
+          // A seller who is authenticated will always get a non-null status.
+          Navigator.of(context).pushReplacementNamed('/login');
           return;
         }
         if (status == 'pending') {
@@ -106,10 +116,8 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
         final status = await RiderAuthService.syncSession();
         if (!mounted) return;
         if (status == null) {
-          Navigator.of(context).pushReplacementNamed(
-            '/unauthorized',
-            arguments: 'No rider profile found for this account.',
-          );
+          // Same logic: null means no session, not missing rider profile.
+          Navigator.of(context).pushReplacementNamed('/login');
           return;
         }
         if (status == 'pending') {
@@ -138,6 +146,7 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
         );
       }
 
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(role.route);
     } catch (e) {
       if (mounted) {
@@ -157,9 +166,9 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
             // Brand
             FadeTransition(
               opacity: _fadeAnimation,
-              child: Column(
+              child: const Column(
                 children: [
-                  const Text(
+                  Text(
                     'VARÓN',
                     style: TextStyle(
                       fontSize: 28,
@@ -168,8 +177,8 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
                       letterSpacing: 10,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: 8),
+                  Text(
                     'PREMIUM MINIMALIST FASHION',
                     style: TextStyle(
                       fontSize: 8,

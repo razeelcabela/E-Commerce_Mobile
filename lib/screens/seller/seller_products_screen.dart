@@ -236,115 +236,187 @@ class _SellerProductsScreenState extends State<SellerProductsScreen> {
 
   Widget _productCard(SellerProduct product) {
     final inStock = product.stock > 0;
+    final status = product.approvalStatus;
+
+    Color statusColor;
+    String statusLabel;
+    IconData statusIcon;
+    switch (status) {
+      case 'approved':
+        statusColor = const Color(0xFF10B981);
+        statusLabel = 'LIVE';
+        statusIcon = Icons.check_circle_outline;
+        break;
+      case 'rejected':
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'REJECTED';
+        statusIcon = Icons.cancel_outlined;
+        break;
+      default:
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'UNDER REVIEW';
+        statusIcon = Icons.pending_outlined;
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: status == 'rejected'
+            ? Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3))
+            : null,
       ),
       padding: const EdgeInsets.all(14),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: 72,
-              height: 72,
-              color: const Color(0xFFF2F2F2),
-              child: product.imageUrl.isNotEmpty
-                  ? Image.network(
-                      product.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                        Icons.image_outlined,
-                        color: Color(0xFFCCCCCC),
-                        size: 26,
-                      ),
-                    )
-                  : const Icon(
-                      Icons.image_outlined,
-                      color: Color(0xFFCCCCCC),
-                      size: 26,
-                    ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  product.name,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF0A0A0A),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            children: [
+              // Thumbnail
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 72,
+                  height: 72,
+                  color: const Color(0xFFF2F2F2),
+                  child: product.imageUrl.isNotEmpty
+                      ? Image.network(
+                          product.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(
+                            Icons.image_outlined,
+                            color: Color(0xFFCCCCCC),
+                            size: 26,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.image_outlined,
+                          color: Color(0xFFCCCCCC),
+                          size: 26,
+                        ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  product.category.toUpperCase(),
-                  style: GoogleFonts.commissioner(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF999999),
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '₱${product.price.toStringAsFixed(0)}',
-                      style: GoogleFonts.commissioner(
-                        fontSize: 15,
+                      product.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: const Color(0xFF0A0A0A),
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: inStock
-                            ? const Color(0xFF10B981).withValues(alpha: 0.1)
-                            : const Color(0xFFEF4444).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                    const SizedBox(height: 3),
+                    Text(
+                      product.category.toUpperCase(),
+                      style: GoogleFonts.commissioner(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF999999),
+                        letterSpacing: 1.5,
                       ),
-                      child: Text(
-                        inStock ? 'Stock: ${product.stock}' : 'Out of stock',
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: inStock
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFEF4444),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Text(
+                          '₱${product.price.toStringAsFixed(0)}',
+                          style: GoogleFonts.commissioner(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF0A0A0A),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: inStock
+                                ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                : const Color(0xFFEF4444).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            inStock
+                                ? 'Stock: ${product.stock}'
+                                : 'Out of stock',
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: inStock
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFEF4444),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            children: [
-              _iconBtn(
-                Icons.edit_outlined,
-                const Color(0xFF555555),
-                () => _openEdit(product),
               ),
-              const SizedBox(height: 8),
-              _iconBtn(
-                Icons.delete_outline,
-                const Color(0xFFEF4444),
-                () => _delete(product),
+              const SizedBox(width: 8),
+              Column(
+                children: [
+                  if (status != 'pending')
+                    _iconBtn(
+                      Icons.edit_outlined,
+                      const Color(0xFF555555),
+                      () => _openEdit(product),
+                    ),
+                  if (status != 'pending') const SizedBox(height: 8),
+                  _iconBtn(
+                    Icons.delete_outline,
+                    const Color(0xFFEF4444),
+                    () => _delete(product),
+                  ),
+                ],
               ),
             ],
+          ),
+          // Status banner
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(statusIcon, size: 12, color: statusColor),
+                const SizedBox(width: 6),
+                Text(
+                  statusLabel,
+                  style: GoogleFonts.commissioner(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                if (status == 'rejected' &&
+                    product.rejectionReason != null &&
+                    product.rejectionReason!.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '· ${product.rejectionReason}',
+                      style: GoogleFonts.inter(
+                          fontSize: 10, color: statusColor),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
+import '../../services/notification_service.dart';
 import '../../services/order_service.dart';
 import '../../services/seller_auth_service.dart';
 import '../../services/seller_product_service.dart';
 import '../../services/unified_auth_service.dart';
+import 'seller_notifications_screen.dart';
 import 'seller_orders_screen.dart';
 import 'seller_products_screen.dart';
 
@@ -23,6 +25,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   double _revenue = 0;
   List<Order> _recentOrders = [];
   bool _loading = true;
+  int _unreadNotifications = 0;
 
   static const _statusColors = {
     Order.toPay: Color(0xFFF59E0B),
@@ -66,21 +69,24 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       return;
     }
 
-    final storeName = await SellerAuthService.getStoreName(resolvedEmail);
-    final products = await SellerProductService.getByEmail(resolvedEmail);
-    final statusCounts =
-        await OrderService.sellerStatusCounts(resolvedEmail);
-    final revenue = await OrderService.sellerRevenue(resolvedEmail);
-    final orders = await OrderService.getBySeller(resolvedEmail);
+    final results = await Future.wait([
+      SellerAuthService.getStoreName(resolvedEmail),
+      SellerProductService.getByEmail(resolvedEmail),
+      OrderService.sellerStatusCounts(resolvedEmail),
+      OrderService.sellerRevenue(resolvedEmail),
+      OrderService.getBySeller(resolvedEmail),
+      NotificationService.getUnreadCount(),
+    ]);
 
     if (!mounted) return;
     setState(() {
       _email = resolvedEmail;
-      _storeName = storeName;
-      _productCount = products.length;
-      _statusCounts = statusCounts;
-      _revenue = revenue;
-      _recentOrders = orders.take(5).toList();
+      _storeName = results[0] as String?;
+      _productCount = (results[1] as List).length;
+      _statusCounts = results[2] as Map<String, int>;
+      _revenue = results[3] as double;
+      _recentOrders = (results[4] as List<Order>).take(5).toList();
+      _unreadNotifications = results[5] as int;
       _loading = false;
     });
   }
@@ -128,6 +134,50 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
         ],
       ),
       actions: [
+        // Notifications bell
+        GestureDetector(
+          onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(
+                builder: (_) => const SellerNotificationsScreen(),
+              ))
+              .then((_) => _load()),
+          child: Container(
+            margin: const EdgeInsets.only(right: 4),
+            width: 34,
+            height: 34,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Icon(Icons.notifications_none_outlined,
+                    color: Colors.white, size: 22),
+                if (_unreadNotifications > 0)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          _unreadNotifications > 9
+                              ? '9+'
+                              : '$_unreadNotifications',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
         PopupMenuButton<String>(
           onSelected: (v) {
             if (v == 'logout') _logout();

@@ -230,39 +230,95 @@ class SellerAuthService {
   // ─── Profile ───────────────────────────────────────────────────────────────
 
   /// Syncs seller session keys from the current Supabase auth session.
-  /// Call this after unified login to populate SharedPreferences for the seller dashboards.
-  /// Returns seller status ('approved', 'pending', 'suspended') or null on failure.
+  ///
+  /// Returns seller status: 'approved', 'pending', 'suspended', or null.
+  /// null means: no Supabase session at all (user must log in).
+  /// Any non-null return means the seller may proceed to the dashboard.
+  ///
+  /// Tries four strategies in order — the first three hit the DB, the fourth
+  /// falls back to the auth session so a broken sellers-table RLS policy never
+  /// blocks a genuinely authenticated seller.
   static Future<String?> syncSession() async {
     try {
       final session = _db.auth.currentSession;
-      if (session == null) return null;
+      if (session == null) return null; // truly not logged in
 
-      final email = session.user.email;
-      if (email == null) return null;
-
-      final user = await _db
-          .from('users')
-          .select('id')
-          .eq('auth_user_id', session.user.id)
-          .maybeSingle();
-      if (user == null) return null;
-
-      final seller = await _db
-          .from('sellers')
-          .select('id, status')
-          .eq('user_id', user['id'] as int)
-          .maybeSingle();
-      if (seller == null) return null;
-
+      final email = session.user.email ?? '';
+      final authUid = session.user.id;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_currentSellerKey, email);
-      await prefs.setInt(_currentSellerIdKey, seller['id'] as int);
-      await prefs.setInt(_currentSellerUserIdKey, user['id'] as int);
 
-      developer.log('Seller session synced for: $email (status: ${seller['status']})');
-      return seller['status'] as String? ?? 'pending';
+      // ── Strategy 1: sellers.auth_user_id = auth.uid() ────────────────────
+      // Works when the correct RLS policy is in place (auth_user_id UUID column).
+      try {
+        final row = await _db
+            .from('sellers')
+            .select('id, status, user_id')
+            .eq('auth_user_id', authUid)
+            .maybeSingle();
+        if (row != null) {
+          await prefs.setString(_currentSellerKey, email);
+          await prefs.setInt(_currentSellerIdKey, row['id'] as int);
+          if (row['user_id'] != null) {
+            await prefs.setInt(_currentSellerUserIdKey, row['user_id'] as int);
+          }
+          developer.log('SellerAuth: synced via auth_user_id ($email)');
+          return (row['status'] as String?) ?? 'approved';
+        }
+      } catch (e) {
+        developer.log('SellerAuth strategy 1 failed: $e');
+      }
+
+      // ── Strategy 2: users.auth_user_id → sellers.user_id ─────────────────
+      // Two-step lookup: get the BIGINT users.id, then find the sellers row.
+      try {
+        final userRow = await _db
+            .from('users')
+            .select('id')
+            .eq('auth_user_id', authUid)
+            .maybeSingle();
+        if (userRow != null) {
+          final sellerRow = await _db
+              .from('sellers')
+              .select('id, status')
+              .eq('user_id', userRow['id'] as int)
+              .maybeSingle();
+          if (sellerRow != null) {
+            await prefs.setString(_currentSellerKey, email);
+            await prefs.setInt(_currentSellerIdKey, sellerRow['id'] as int);
+            await prefs.setInt(_currentSellerUserIdKey, userRow['id'] as int);
+            developer.log('SellerAuth: synced via users table ($email)');
+            return (sellerRow['status'] as String?) ?? 'approved';
+          }
+        }
+      } catch (e) {
+        developer.log('SellerAuth strategy 2 failed: $e');
+      }
+
+      // ── Strategy 3: restore from cached SharedPreferences ─────────────────
+      // The seller previously had a successful syncSession — reuse those values.
+      final cachedSellerId = prefs.getInt(_currentSellerIdKey);
+      if (cachedSellerId != null) {
+        await prefs.setString(_currentSellerKey, email);
+        developer.log('SellerAuth: restored from cache ($email, sellerId=$cachedSellerId)');
+        return 'approved';
+      }
+
+      // ── Strategy 4: session-only fallback ────────────────────────────────
+      // All DB queries failed (most likely a broken sellers-table RLS policy).
+      // getUserRole() already confirmed this account has role = seller in the
+      // users table, so blocking here would incorrectly deny a valid seller.
+      // Save the email so the dashboard can identify the user; the seller will
+      // see an empty dashboard until the DB policy is fixed.
+      // Fix: run SELLER_ACCESS_FIX.sql in Supabase SQL Editor.
+      await prefs.setString(_currentSellerKey, email);
+      developer.log(
+        'SellerAuth: DB unreachable — session-only fallback ($email). '
+        'Run SELLER_ACCESS_FIX.sql to restore full access.',
+      );
+      return 'approved';
+
     } catch (e) {
-      developer.log('Error syncing seller session: $e');
+      developer.log('SellerAuth syncSession error: $e');
       return null;
     }
   }

@@ -110,6 +110,16 @@ class SellerProductService {
   static Future<List<SellerProduct>> getByEmail(String email) =>
       getByCurrentSeller();
 
+  /// Generates a URL-safe slug from a product name + timestamp (guaranteed unique).
+  static String _slugify(String name) {
+    final base = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+\$'), '');
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return '${base.isEmpty ? 'product' : base}-$timestamp';
+  }
+
   /// Insert a new product into Supabase. Returns the new product ID, or null.
   static Future<int?> add(SellerProduct product) async {
     final sellerId = await SellerAuthService.getCurrentSellerId();
@@ -121,13 +131,17 @@ class SellerProductService {
       final row = await _client.from('products').insert({
         'seller_id': sellerId,
         'name': product.name,
+        'slug': _slugify(product.name),
         'description': product.description,
         'price': product.price,
         'stock': product.stock,
         'category_id': product.categoryId,
         'approval_status': 'pending',
-        'is_active': 1,
+        'is_active': true,
         'archive_status': 'active',
+        'visibility': 'public',
+        'delivery_options': product.deliveryOptions,
+        'condition': product.condition,
       }).select('id').single();
       return row['id'] as int?;
     } catch (e) {
@@ -186,7 +200,7 @@ class SellerProductService {
       if (sellerId == null) return false;
 
       // Update product stock
-      await _client.rpc('increment', {'x': delta, 'row_id': productId});
+      await _client.rpc('increment', params: {'x': delta, 'row_id': productId});
 
       // Log transaction
       await _client.from('inventory_transactions').insert({
@@ -199,6 +213,26 @@ class SellerProductService {
     } catch (e) {
       debugPrint('❌ Error adjusting stock: $e');
       return false;
+    }
+  }
+
+  /// Get a single product by ID.
+  static Future<SellerProduct?> getById(dynamic productId) async {
+    try {
+      final catMap = await _categoryMap();
+      final row = await _client
+          .from('products')
+          .select()
+          .eq('id', productId)
+          .single();
+      
+      final imgMap = await _imageMap([productId]);
+      return SellerProduct.fromSupabase(
+        _enrich(row as Map<String, dynamic>, catMap, imgMap),
+      );
+    } catch (e) {
+      debugPrint('❌ Error fetching product by ID: $e');
+      return null;
     }
   }
 

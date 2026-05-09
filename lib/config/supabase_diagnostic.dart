@@ -71,7 +71,7 @@ class SupabaseDiagnostic {
       debugPrint('🔍 Testing Realtime connection...');
       
       // Realtime is optional - just verify the client can create channels
-      final channel = client.channel('test-channel');
+      client.channel('test-channel');
       debugPrint('✅ PASS: Realtime channel object created successfully');
       
     } catch (e) {

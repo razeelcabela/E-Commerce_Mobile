@@ -116,11 +116,11 @@ class _ShopScreenState extends State<ShopScreen> {
             // Use fallback if no products from Supabase
             allProducts = fallbackProducts;
             errorMessage = '⚠️ Loading from fallback data. Check Supabase connection.';
-            print('⚠️ No products from Supabase, using fallback data');
+            debugPrint('⚠️ No products from Supabase, using fallback data');
           } else {
             allProducts = products;
             errorMessage = null;
-            print('✅ Loaded ${products.length} products from Supabase');
+            debugPrint('✅ Loaded ${products.length} products from Supabase');
           }
           availableCategories = categories;
           isLoading = false;
@@ -132,7 +132,7 @@ class _ShopScreenState extends State<ShopScreen> {
           allProducts = fallbackProducts;
           errorMessage = '❌ Connection error: $e';
           isLoading = false;
-          print('❌ Error loading products: $e');
+          debugPrint('❌ Error loading products: $e');
         });
       }
     }
@@ -183,7 +183,6 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
-    final filteredProducts = getFilteredProducts();
     final cartCount = cartService.getCartCount();
 
     return Scaffold(

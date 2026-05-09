@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 import '../../services/seller_auth_service.dart';
@@ -23,6 +24,14 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   List<Order> _recentOrders = [];
   bool _loading = true;
 
+  static const _statusColors = {
+    Order.toPay: Color(0xFFF59E0B),
+    Order.toShip: Color(0xFF3B82F6),
+    Order.shipped: Color(0xFF6366F1),
+    Order.toReceive: Color(0xFF14B8A6),
+    Order.completed: Color(0xFF10B981),
+  };
+
   @override
   void initState() {
     super.initState();
@@ -30,7 +39,6 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _load() async {
-    // Role guard: only seller accounts may access this dashboard
     final role = await UnifiedAuthService.getUserRole();
     if (role != UserRole.seller) {
       if (mounted) {
@@ -44,7 +52,6 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
     final email = await SellerAuthService.getCurrentSellerEmail();
     if (email == null) {
-      // Session keys missing — try to re-sync then retry
       final status = await SellerAuthService.syncSession();
       if (status == null) {
         if (mounted) Navigator.of(context).pushReplacementNamed('/login');
@@ -52,14 +59,17 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
       }
     }
 
-    final resolvedEmail = email ?? await SellerAuthService.getCurrentSellerEmail();
+    final resolvedEmail =
+        email ?? await SellerAuthService.getCurrentSellerEmail();
     if (resolvedEmail == null) {
       if (mounted) Navigator.of(context).pushReplacementNamed('/login');
       return;
     }
+
     final storeName = await SellerAuthService.getStoreName(resolvedEmail);
     final products = await SellerProductService.getByEmail(resolvedEmail);
-    final statusCounts = await OrderService.sellerStatusCounts(resolvedEmail);
+    final statusCounts =
+        await OrderService.sellerStatusCounts(resolvedEmail);
     final revenue = await OrderService.sellerRevenue(resolvedEmail);
     final orders = await OrderService.getBySeller(resolvedEmail);
 
@@ -82,282 +92,312 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'VARÓN',
-              style: TextStyle(
-                color: Color(0xFF0A0A0A),
-                fontSize: 16,
-                fontWeight: FontWeight.w300,
-                letterSpacing: 6,
-              ),
+      backgroundColor: const Color(0xFFF4F3F0),
+      appBar: _buildAppBar(),
+      body: _loading ? _loadingView() : _body(),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: const Color(0xFF0A0A0A),
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'VARÓN',
+            style: GoogleFonts.commissioner(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 6,
             ),
-            Text(
-              'SELLER PORTAL',
-              style: TextStyle(
-                color: Color(0xFF999999),
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'logout') _logout();
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'logout', child: Text('Sign Out')),
-            ],
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Icon(Icons.account_circle_outlined,
-                      color: Color(0xFF0A0A0A), size: 20),
-                ],
-              ),
+          ),
+          Text(
+            'SELLER PORTAL',
+            style: GoogleFonts.commissioner(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 7,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 2.5,
             ),
           ),
         ],
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: Color(0xFF0A0A0A),
+      actions: [
+        PopupMenuButton<String>(
+          onSelected: (v) {
+            if (v == 'logout') _logout();
+          },
+          color: Colors.white,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'logout',
+              child: Text(
+                'Sign Out',
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: const Color(0xFF0A0A0A)),
               ),
-            )
-          : RefreshIndicator(
-              onRefresh: _load,
-              color: const Color(0xFF0A0A0A),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 48,
-                  vertical: isMobile ? 24 : 40,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Store header
-                    Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.all(24),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            color: const Color(0xFF0A0A0A),
-                            child: Center(
-                              child: Text(
-                                (_storeName ?? '?')
-                                    .substring(0, 1)
-                                    .toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _storeName ?? '—',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF0A0A0A),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _email ?? '',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF888888),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Stats row
-                    Row(
-                      children: [
-                        _statCard('PRODUCTS', '$_productCount', isMobile),
-                        const SizedBox(width: 12),
-                        _statCard(
-                          'REVENUE',
-                          '₱${_revenue.toStringAsFixed(0)}',
-                          isMobile,
-                        ),
-                        const SizedBox(width: 12),
-                        _statCard(
-                          'TO SHIP',
-                          '${_statusCounts[Order.toShip] ?? 0}',
-                          isMobile,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Order status overview
-                    _sectionHeader('ORDER STATUS'),
-                    const SizedBox(height: 16),
-                    Container(
-                      color: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Row(
-                        children: [
-                          _orderStatusTile(
-                            Icons.credit_card_outlined,
-                            'TO PAY',
-                            _statusCounts[Order.toPay] ?? 0,
-                          ),
-                          _orderStatusTile(
-                            Icons.inventory_2_outlined,
-                            'TO SHIP',
-                            _statusCounts[Order.toShip] ?? 0,
-                          ),
-                          _orderStatusTile(
-                            Icons.local_shipping_outlined,
-                            'SHIPPED',
-                            _statusCounts[Order.shipped] ?? 0,
-                          ),
-                          _orderStatusTile(
-                            Icons.move_to_inbox_outlined,
-                            'TO RECEIVE',
-                            _statusCounts[Order.toReceive] ?? 0,
-                          ),
-                          _orderStatusTile(
-                            Icons.check_circle_outline,
-                            'COMPLETED',
-                            _statusCounts[Order.completed] ?? 0,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Quick actions
-                    _sectionHeader('MANAGE'),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _actionCard(
-                            Icons.inventory_outlined,
-                            'PRODUCTS',
-                            'Add, edit & manage listings',
-                            () => Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const SellerProductsScreen(),
-                            )).then((_) => _load()),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _actionCard(
-                            Icons.receipt_long_outlined,
-                            'ORDERS',
-                            'View & update order status',
-                            () => Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const SellerOrdersScreen(),
-                            )).then((_) => _load()),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Recent orders
-                    if (_recentOrders.isNotEmpty) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _sectionHeader('RECENT ORDERS'),
-                          GestureDetector(
-                            onTap: () => Navigator.of(context)
-                                .push(MaterialPageRoute(
-                                  builder: (_) => const SellerOrdersScreen(),
-                                ))
-                                .then((_) => _load()),
-                            child: const Text(
-                              'SEE ALL',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF888888),
-                                letterSpacing: 1.5,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        color: Colors.white,
-                        child: Column(
-                          children: _recentOrders
-                              .map((o) => _orderRow(o))
-                              .toList(),
-                        ),
-                      ),
-                    ],
-                  ],
+            ),
+          ],
+          child: Container(
+            margin: const EdgeInsets.only(right: 16),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.12),
+            ),
+            child: Center(
+              child: Text(
+                (_storeName ?? _email ?? '?').substring(0, 1).toUpperCase(),
+                style: GoogleFonts.commissioner(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _statCard(String label, String value, bool isMobile) {
-    return Expanded(
-      child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+  Widget _loadingView() {
+    return const Center(
+      child: CircularProgressIndicator(
+        strokeWidth: 1.5,
+        color: Color(0xFF0A0A0A),
+      ),
+    );
+  }
+
+  Widget _body() {
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: const Color(0xFF0A0A0A),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w300,
-                color: Color(0xFF0A0A0A),
+            _storeCard(),
+            const SizedBox(height: 16),
+            _statsRow(),
+            const SizedBox(height: 24),
+            _sectionLabel('ORDER STATUS'),
+            const SizedBox(height: 12),
+            _orderStatusCard(),
+            const SizedBox(height: 24),
+            _sectionLabel('MANAGE'),
+            const SizedBox(height: 12),
+            _actionCard(
+              icon: Icons.inventory_outlined,
+              title: 'Products',
+              subtitle: 'Add, edit & manage listings',
+              count: _productCount,
+              onTap: () => Navigator.of(context)
+                  .push(MaterialPageRoute(
+                    builder: (_) => const SellerProductsScreen(),
+                  ))
+                  .then((_) => _load()),
+            ),
+            const SizedBox(height: 10),
+            _actionCard(
+              icon: Icons.receipt_long_outlined,
+              title: 'Orders',
+              subtitle: 'View & update order status',
+              count: _statusCounts[Order.toShip] ?? 0,
+              countLabel: 'to ship',
+              onTap: () => Navigator.of(context)
+                  .push(MaterialPageRoute(
+                    builder: (_) => const SellerOrdersScreen(),
+                  ))
+                  .then((_) => _load()),
+            ),
+            if (_recentOrders.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _sectionLabel('RECENT ORDERS'),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context)
+                        .push(MaterialPageRoute(
+                          builder: (_) => const SellerOrdersScreen(),
+                        ))
+                        .then((_) => _load()),
+                    child: Text(
+                      'SEE ALL',
+                      style: GoogleFonts.commissioner(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF888888),
+                        letterSpacing: 1.5,
+                        decoration: TextDecoration.underline,
+                        decorationColor: const Color(0xFFCCCCCC),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _recentOrdersCard(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _storeCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(
+              color: Color(0xFF0A0A0A),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                (_storeName ?? '?').substring(0, 1).toUpperCase(),
+                style: GoogleFonts.commissioner(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w300,
+                ),
               ),
             ),
-            const SizedBox(height: 6),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _storeName ?? '—',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0A0A0A),
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _email ?? '',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: const Color(0xFF888888),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              'ACTIVE',
+              style: GoogleFonts.commissioner(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF10B981),
+                letterSpacing: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statsRow() {
+    return Row(
+      children: [
+        _statCard(
+          label: 'PRODUCTS',
+          value: '$_productCount',
+          icon: Icons.inventory_2_outlined,
+          color: const Color(0xFF3B82F6),
+        ),
+        const SizedBox(width: 10),
+        _statCard(
+          label: 'REVENUE',
+          value: '₱${_revenue >= 1000 ? '${(_revenue / 1000).toStringAsFixed(1)}k' : _revenue.toStringAsFixed(0)}',
+          icon: Icons.payments_outlined,
+          color: const Color(0xFF10B981),
+        ),
+        const SizedBox(width: 10),
+        _statCard(
+          label: 'TO SHIP',
+          value: '${_statusCounts[Order.toShip] ?? 0}',
+          icon: Icons.local_shipping_outlined,
+          color: const Color(0xFFF59E0B),
+        ),
+      ],
+    );
+  }
+
+  Widget _statCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              value,
+              style: GoogleFonts.commissioner(
+                fontSize: 20,
+                fontWeight: FontWeight.w300,
+                color: const Color(0xFF0A0A0A),
+              ),
+            ),
+            const SizedBox(height: 2),
             Text(
               label,
-              style: const TextStyle(
-                fontSize: 8,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF999999),
-                letterSpacing: 2,
+              style: GoogleFonts.commissioner(
+                fontSize: 7,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF999999),
+                letterSpacing: 1.5,
               ),
             ),
           ],
@@ -366,46 +406,92 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
-  Widget _orderStatusTile(IconData icon, String label, int count) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            '$count',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w300,
-              color: Color(0xFF0A0A0A),
+  Widget _orderStatusCard() {
+    final statuses = [
+      (Order.toPay, Icons.credit_card_outlined, 'TO PAY'),
+      (Order.toShip, Icons.inventory_2_outlined, 'TO SHIP'),
+      (Order.shipped, Icons.local_shipping_outlined, 'SHIPPED'),
+      (Order.toReceive, Icons.move_to_inbox_outlined, 'RECEIVED'),
+      (Order.completed, Icons.check_circle_outline, 'DONE'),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+      child: Row(
+        children: statuses.map((s) {
+          final color =
+              _statusColors[s.$1] ?? const Color(0xFF888888);
+          final count = _statusCounts[s.$1] ?? 0;
+          return Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(s.$2, size: 16, color: color),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$count',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w300,
+                    color: const Color(0xFF0A0A0A),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  s.$3,
+                  style: GoogleFonts.commissioner(
+                    fontSize: 6,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF999999),
+                    letterSpacing: 0.8,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Icon(icon, size: 18, color: const Color(0xFF0A0A0A)),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 7,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF888888),
-              letterSpacing: 1,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _actionCard(
-      IconData icon, String title, String subtitle, VoidCallback onTap) {
+  Widget _actionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    int count = 0,
+    String countLabel = '',
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: const Color(0xFF0A0A0A)),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0A0A0A),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 20, color: Colors.white),
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -413,57 +499,107 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF0A0A0A),
-                      letterSpacing: 1.5,
+                    style: GoogleFonts.commissioner(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0A0A0A),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Color(0xFF999999),
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFF999999),
                     ),
                   ),
                 ],
               ),
             ),
+            if (count > 0) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$count $countLabel',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFF59E0B),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             const Icon(Icons.arrow_forward_ios,
-                size: 12, color: Color(0xFFAAAAAA)),
+                size: 13, color: Color(0xFFCCCCCC)),
           ],
         ),
       ),
     );
   }
 
+  Widget _recentOrdersCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: _recentOrders.asMap().entries.map((e) {
+          final i = e.key;
+          final o = e.value;
+          return Column(
+            children: [
+              _orderRow(o),
+              if (i < _recentOrders.length - 1)
+                const Divider(
+                    height: 1, indent: 16, endIndent: 16,
+                    color: Color(0xFFF0F0F0)),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _orderRow(Order order) {
+    final color = _statusColors[order.status] ?? const Color(0xFF888888);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   order.productName,
-                  style: const TextStyle(
-                    fontSize: 12,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF0A0A0A),
+                    color: const Color(0xFF0A0A0A),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   order.buyerEmail,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF999999),
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: const Color(0xFF999999),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -477,14 +613,22 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
             children: [
               Text(
                 '₱${order.total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontSize: 12,
+                style: GoogleFonts.commissioner(
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF0A0A0A),
+                  color: const Color(0xFF0A0A0A),
                 ),
               ),
-              const SizedBox(height: 4),
-              _statusBadge(order.status),
+              const SizedBox(height: 3),
+              Text(
+                Order.statusLabel(order.status).toUpperCase(),
+                style: GoogleFonts.commissioner(
+                  fontSize: 7,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                  letterSpacing: 0.8,
+                ),
+              ),
             ],
           ),
         ],
@@ -492,33 +636,13 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
     );
   }
 
-  Widget _statusBadge(String status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      color: status == Order.completed
-          ? const Color(0xFF0A0A0A)
-          : const Color(0xFFF0F0F0),
-      child: Text(
-        Order.statusLabel(status).toUpperCase(),
-        style: TextStyle(
-          fontSize: 7,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1,
-          color: status == Order.completed
-              ? Colors.white
-              : const Color(0xFF555555),
-        ),
-      ),
-    );
-  }
-
-  Widget _sectionHeader(String title) {
+  Widget _sectionLabel(String title) {
     return Text(
       title,
-      style: const TextStyle(
+      style: GoogleFonts.commissioner(
         fontSize: 9,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF0A0A0A),
+        color: const Color(0xFF888888),
         letterSpacing: 3,
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 
@@ -16,7 +17,6 @@ class _RiderDeliveryDetailScreenState
   late Order _order;
   bool _updating = false;
 
-  // Ordered progression of rider delivery statuses
   static const List<String> _flow = [
     Order.riderAccepted,
     Order.pickedUp,
@@ -26,11 +26,11 @@ class _RiderDeliveryDetailScreenState
   ];
 
   static const Map<String, String> _stepLabels = {
-    Order.riderAccepted: 'ORDER ACCEPTED',
-    Order.pickedUp: 'PICKED UP',
-    Order.inTransit: 'IN TRANSIT',
-    Order.nearLocation: 'NEAR LOCATION',
-    Order.delivered: 'DELIVERED',
+    Order.riderAccepted: 'Order Accepted',
+    Order.pickedUp: 'Picked Up',
+    Order.inTransit: 'In Transit',
+    Order.nearLocation: 'Near Location',
+    Order.delivered: 'Delivered',
   };
 
   static const Map<String, String> _stepDescriptions = {
@@ -48,6 +48,14 @@ class _RiderDeliveryDetailScreenState
     Order.nearLocation: 'MARK AS DELIVERED',
   };
 
+  static const _stepColors = {
+    Order.riderAccepted: Color(0xFF3B82F6),
+    Order.pickedUp: Color(0xFF6366F1),
+    Order.inTransit: Color(0xFFF59E0B),
+    Order.nearLocation: Color(0xFF10B981),
+    Order.delivered: Color(0xFF10B981),
+  };
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +71,6 @@ class _RiderDeliveryDetailScreenState
   Future<void> _advanceStatus() async {
     final next = _nextStatus;
     if (next == null) return;
-
     setState(() => _updating = true);
     await OrderService.updateStatus(_order.id, next);
     if (!mounted) return;
@@ -71,18 +78,19 @@ class _RiderDeliveryDetailScreenState
       _order.status = next;
       _updating = false;
     });
-
     if (next == Order.delivered) {
-      _snack('Delivery completed! Commission: ₱${_order.commission.toStringAsFixed(2)}');
+      _snack(
+          'Delivery completed! Commission: ₱${_order.commission.toStringAsFixed(2)}');
     }
   }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
+      content: Text(msg,
+          style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
       backgroundColor: const Color(0xFF0A0A0A),
       behavior: SnackBarBehavior.floating,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       margin: const EdgeInsets.all(16),
     ));
   }
@@ -90,74 +98,64 @@ class _RiderDeliveryDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: const Color(0xFFF4F3F0),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A0A0A),
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios,
+          icon: const Icon(Icons.arrow_back_ios_new,
               size: 16, color: Colors.white),
         ),
-        title: const Text(
+        title: Text(
           'DELIVERY DETAIL',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.commissioner(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
             letterSpacing: 3,
             color: Colors.white,
           ),
         ),
-        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildOrderCard(),
-            const SizedBox(height: 16),
-            _buildDeliveryTimeline(),
-            const SizedBox(height: 16),
-            _buildAddressCard(),
+            _orderCard(),
+            const SizedBox(height: 14),
+            _timelineCard(),
+            const SizedBox(height: 14),
+            _addressCard(),
             const SizedBox(height: 24),
-            if (_order.status != Order.delivered) _buildActionButton(),
-            if (_order.status == Order.delivered) _buildCompletedBanner(),
-            const SizedBox(height: 32),
+            if (_order.status != Order.delivered) _actionButton(),
+            if (_order.status == Order.delivered) _completedBanner(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildOrderCard() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
+  // ── Order card ─────────────────────────────────────────────────────────────
+
+  Widget _orderCard() {
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'ORDER DETAILS',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
-              color: Color(0xFF0A0A0A),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(width: 24, height: 1, color: const Color(0xFF0A0A0A)),
+          _cardHeader('ORDER DETAILS'),
           const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
-                color: const Color(0xFFF0F0F0),
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F6F4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: const Icon(Icons.shopping_bag_outlined,
-                    size: 22, color: Color(0xFF888888)),
+                    size: 24, color: Color(0xFFAAAAAA)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -166,17 +164,17 @@ class _RiderDeliveryDetailScreenState
                   children: [
                     Text(
                       _order.productName,
-                      style: const TextStyle(
-                        fontSize: 14,
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0A0A0A),
+                        color: const Color(0xFF0A0A0A),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Qty: ${_order.quantity}  ·  ₱${_order.total.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF888888)),
+                      'Qty ${_order.quantity}  ·  ₱${_order.total.toStringAsFixed(2)}',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: const Color(0xFF888888)),
                     ),
                   ],
                 ),
@@ -185,25 +183,33 @@ class _RiderDeliveryDetailScreenState
           ),
           const SizedBox(height: 16),
           Container(height: 1, color: const Color(0xFFF0F0F0)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'YOUR COMMISSION',
-                style: TextStyle(
+                style: GoogleFonts.commissioner(
                   fontSize: 9,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 2,
-                  color: Color(0xFF888888),
+                  color: const Color(0xFF999999),
                 ),
               ),
-              Text(
-                '₱${_order.commission.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w300,
-                  color: Color(0xFF0A0A0A),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '₱${_order.commission.toStringAsFixed(2)}',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF10B981),
+                  ),
                 ),
               ),
             ],
@@ -213,25 +219,14 @@ class _RiderDeliveryDetailScreenState
     );
   }
 
-  Widget _buildDeliveryTimeline() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
+  // ── Timeline card ──────────────────────────────────────────────────────────
+
+  Widget _timelineCard() {
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'DELIVERY PROGRESS',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
-              color: Color(0xFF0A0A0A),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(width: 24, height: 1, color: const Color(0xFF0A0A0A)),
+          _cardHeader('DELIVERY PROGRESS'),
           const SizedBox(height: 20),
           ..._flow.asMap().entries.map((entry) {
             final idx = entry.key;
@@ -241,26 +236,29 @@ class _RiderDeliveryDetailScreenState
             final isActive = idx == currentIdx;
             final isPending = idx > currentIdx;
             final isLast = idx == _flow.length - 1;
+            final stepColor =
+                _stepColors[step] ?? const Color(0xFF888888);
 
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Timeline indicator
+                // Indicator column
                 Column(
                   children: [
-                    Container(
-                      width: 22,
-                      height: 22,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         color: isDone
-                            ? const Color(0xFF0A0A0A)
+                            ? stepColor
                             : isActive
-                                ? const Color(0xFF0A0A0A)
+                                ? stepColor
                                 : Colors.transparent,
                         border: Border.all(
                           color: isPending
                               ? const Color(0xFFDDDDDD)
-                              : const Color(0xFF0A0A0A),
+                              : stepColor,
                           width: 1.5,
                         ),
                         shape: BoxShape.circle,
@@ -269,20 +267,21 @@ class _RiderDeliveryDetailScreenState
                         isDone
                             ? Icons.check
                             : isActive
-                                ? Icons.radio_button_checked
+                                ? Icons.circle
                                 : Icons.circle_outlined,
-                        size: 12,
+                        size: isDone ? 13 : 10,
                         color: isDone || isActive
                             ? Colors.white
                             : const Color(0xFFDDDDDD),
                       ),
                     ),
                     if (!isLast)
-                      Container(
-                        width: 1.5,
-                        height: 36,
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: 2,
+                        height: isActive ? 52 : 36,
                         color: isDone
-                            ? const Color(0xFF0A0A0A)
+                            ? stepColor
                             : const Color(0xFFEEEEEE),
                       ),
                   ],
@@ -290,29 +289,30 @@ class _RiderDeliveryDetailScreenState
                 const SizedBox(width: 14),
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
+                    padding: EdgeInsets.only(
+                        bottom: isLast ? 0 : (isActive ? 16 : 12)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           _stepLabels[step] ?? step,
-                          style: TextStyle(
-                            fontSize: 11,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
                             fontWeight: isActive
                                 ? FontWeight.w700
                                 : FontWeight.w500,
                             color: isPending
                                 ? const Color(0xFFCCCCCC)
                                 : const Color(0xFF0A0A0A),
-                            letterSpacing: 1,
                           ),
                         ),
                         if (isActive) ...[
                           const SizedBox(height: 4),
                           Text(
                             _stepDescriptions[step] ?? '',
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF888888),
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF888888),
                                 height: 1.4),
                           ),
                         ],
@@ -328,37 +328,39 @@ class _RiderDeliveryDetailScreenState
     );
   }
 
-  Widget _buildAddressCard() {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
+  // ── Address card ───────────────────────────────────────────────────────────
+
+  Widget _addressCard() {
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'DELIVERY ADDRESS',
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
-              color: Color(0xFF0A0A0A),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(width: 24, height: 1, color: const Color(0xFF0A0A0A)),
+          _cardHeader('DELIVERY ADDRESS'),
           const SizedBox(height: 14),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 16, color: Color(0xFF888888)),
-              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.location_on_outlined,
+                    size: 16, color: Color(0xFFEF4444)),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  _order.deliveryAddress,
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF0A0A0A), height: 1.5),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _order.deliveryAddress,
+                    style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: const Color(0xFF0A0A0A),
+                        height: 1.5),
+                  ),
                 ),
               ),
             ],
@@ -368,33 +370,37 @@ class _RiderDeliveryDetailScreenState
     );
   }
 
-  Widget _buildActionButton() {
+  // ── Action button ──────────────────────────────────────────────────────────
+
+  Widget _actionButton() {
     final label = _nextActionLabel[_order.status] ?? 'UPDATE STATUS';
+    final currentColor =
+        _stepColors[_order.status] ?? const Color(0xFF0A0A0A);
     return SizedBox(
       width: double.infinity,
-      height: 52,
+      height: 56,
       child: ElevatedButton(
         onPressed: _updating ? null : _advanceStatus,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF0A0A0A),
+          backgroundColor: currentColor,
           disabledBackgroundColor: const Color(0xFFCCCCCC),
           elevation: 0,
-          shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.zero),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14)),
         ),
         child: _updating
             ? const SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2),
+                    color: Colors.white, strokeWidth: 1.5),
               )
             : Text(
                 label,
-                style: const TextStyle(
+                style: GoogleFonts.commissioner(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 2.5,
+                  letterSpacing: 2,
                   color: Colors.white,
                 ),
               ),
@@ -402,39 +408,79 @@ class _RiderDeliveryDetailScreenState
     );
   }
 
-  Widget _buildCompletedBanner() {
+  Widget _completedBanner() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      color: const Color(0xFFF1F8E9),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle,
-              color: Color(0xFF2E7D32), size: 28),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle,
+                color: Color(0xFF10B981), size: 24),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'DELIVERY COMPLETED',
-                  style: TextStyle(
-                    fontSize: 11,
+                Text(
+                  'Delivery Completed',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 2,
-                    color: Color(0xFF2E7D32),
+                    color: const Color(0xFF10B981),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   'Commission earned: ₱${_order.commission.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF555555)),
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: const Color(0xFF555555)),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: child,
+    );
+  }
+
+  Widget _cardHeader(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.commissioner(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 2.5,
+        color: const Color(0xFF888888),
       ),
     );
   }

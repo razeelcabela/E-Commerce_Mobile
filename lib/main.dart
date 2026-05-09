@@ -12,6 +12,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/pending_approval_screen.dart';
 import 'screens/shop_screen.dart';
 import 'screens/unauthorized_screen.dart';
+import 'screens/admin/admin_dashboard_screen.dart';
 import 'screens/seller/seller_dashboard_screen.dart';
 import 'screens/rider/rider_dashboard_screen.dart';
 
@@ -102,6 +103,7 @@ class MyApp extends StatelessWidget {
         '/onboarding':        (context) => const OnboardingScreen(),
         '/home':              (context) => const HomeScreen(),
         '/shop':              (context) => const ShopScreen(),
+        '/admin/dashboard':   (context) => const AdminDashboardScreen(),
         '/seller/dashboard':  (context) => const SellerDashboardScreen(),
         '/rider/dashboard':   (context) => const RiderDashboardScreen(),
         '/unauthorized':      (context) => const UnauthorizedScreen(),

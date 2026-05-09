@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../models/seller_product.dart';
 import '../../services/seller_product_service.dart';
 
@@ -19,17 +22,22 @@ class SellerAddProductScreen extends StatefulWidget {
 class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  final _imageCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
-  String _category = 'Shirts';
+
   bool _saving = false;
 
-  bool get _isEdit => widget.existing != null;
+  // Image state
+  Uint8List? _pickedBytes;
+  String _pickedExt = 'jpg';
+  String _existingImageUrl = '';
 
-  static const _categories = [
-    'Shirts', 'Pants', 'T-Shirts', 'Accessories', 'Other'
-  ];
+  // Category state (loaded from DB)
+  List<Map<String, dynamic>> _categories = [];
+  int? _selectedCategoryId;
+  String _selectedCategoryName = '';
+
+  bool get _isEdit => widget.existing != null;
 
   @override
   void initState() {
@@ -38,21 +46,49 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
       final p = widget.existing!;
       _nameCtrl.text = p.name;
       _descCtrl.text = p.description;
-      _imageCtrl.text = p.imageUrl;
       _priceCtrl.text = p.price.toStringAsFixed(0);
       _stockCtrl.text = '${p.stock}';
-      _category = p.category;
+      _existingImageUrl = p.imageUrl;
+      _selectedCategoryId = p.categoryId;
+      _selectedCategoryName = p.category;
     }
+    _loadCategories();
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
-    _imageCtrl.dispose();
     _priceCtrl.dispose();
     _stockCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    final cats = await SellerProductService.getCategories();
+    if (!mounted) return;
+    setState(() {
+      _categories = cats;
+      if (_selectedCategoryId == null && cats.isNotEmpty) {
+        _selectedCategoryId = cats.first['id'] as int;
+        _selectedCategoryName = cats.first['name'] as String;
+      }
+    });
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    final ext = file.name.split('.').last.toLowerCase();
+    setState(() {
+      _pickedBytes = bytes;
+      _pickedExt = ext.isEmpty ? 'jpg' : ext;
+    });
   }
 
   Future<void> _save() async {
@@ -79,195 +115,349 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
       final p = widget.existing!;
       p.name = _nameCtrl.text.trim();
       p.description = _descCtrl.text.trim();
-      p.imageUrl = _imageCtrl.text.trim();
       p.price = price;
       p.stock = stock;
-      p.category = _category;
+      p.categoryId = _selectedCategoryId;
+      p.category = _selectedCategoryName;
       await SellerProductService.update(p);
+      if (_pickedBytes != null) {
+        await SellerProductService.uploadImage(p.id, _pickedBytes!, _pickedExt);
+      }
     } else {
       final product = SellerProduct(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: 0,
+        sellerId: 0,
         sellerEmail: widget.sellerEmail,
         name: _nameCtrl.text.trim(),
         description: _descCtrl.text.trim(),
-        imageUrl: _imageCtrl.text.trim(),
+        imageUrl: '',
         price: price,
         stock: stock,
-        category: _category,
+        categoryId: _selectedCategoryId,
+        category: _selectedCategoryName,
         createdAt: DateTime.now(),
       );
-      await SellerProductService.add(product);
+      final newId = await SellerProductService.add(product);
+      if (newId != null && _pickedBytes != null) {
+        await SellerProductService.uploadImage(newId, _pickedBytes!, _pickedExt);
+      }
     }
 
     if (!mounted) return;
+    setState(() => _saving = false);
     Navigator.of(context).pop();
   }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
+        content: Text(msg,
+            style: GoogleFonts.inter(fontSize: 13, color: Colors.white)),
         backgroundColor: const Color(0xFF0A0A0A),
         behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         margin: const EdgeInsets.all(16),
       ),
     );
   }
 
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: const Color(0xFFF4F3F0),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0A0A0A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
-              color: Color(0xFF0A0A0A), size: 16),
+              color: Colors.white, size: 16),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           _isEdit ? 'EDIT PRODUCT' : 'NEW PRODUCT',
-          style: const TextStyle(
-            color: Color(0xFF0A0A0A),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.commissioner(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
             letterSpacing: 3,
           ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 20 : 48,
-          vertical: isMobile ? 24 : 40,
-        ),
-        child: Container(
-          color: Colors.white,
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _field('Product name *', _nameCtrl),
-              const SizedBox(height: 24),
-              _field('Description', _descCtrl, maxLines: 3),
-              const SizedBox(height: 24),
-              _field('Image URL', _imageCtrl,
-                  hint: 'https://...'),
-              const SizedBox(height: 24),
-
-              // Preview
-              if (_imageCtrl.text.isNotEmpty) ...[
-                const Text(
-                  'IMAGE PREVIEW',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF888888),
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  height: 160,
-                  color: const Color(0xFFF2F2F2),
-                  child: Image.network(
-                    _imageCtrl.text,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image_outlined,
-                          color: Color(0xFFCCCCCC), size: 32),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ],
-
-              Row(
-                children: [
-                  Expanded(child: _field('Price (₱) *', _priceCtrl,
-                      inputType: TextInputType.number)),
-                  const SizedBox(width: 16),
-                  Expanded(child: _field('Stock *', _stockCtrl,
-                      inputType: TextInputType.number)),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Category dropdown
-              Column(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _imageSection(),
+            const SizedBox(height: 16),
+            _card(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'CATEGORY',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF888888),
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFDDDDDD), width: 1),
+                  _sectionLabel('PRODUCT DETAILS'),
+                  const SizedBox(height: 20),
+                  _field('Product name', _nameCtrl),
+                  const SizedBox(height: 16),
+                  _field('Description', _descCtrl, maxLines: 3),
+                  const SizedBox(height: 16),
+                  _categoryPicker(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            _card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('PRICING & STOCK'),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _field('Price (₱)', _priceCtrl,
+                            inputType: TextInputType.number, prefix: '₱'),
                       ),
-                    ),
-                    child: DropdownButton<String>(
-                      value: _category,
-                      isExpanded: true,
-                      underline: const SizedBox(),
-                      icon: const Icon(Icons.keyboard_arrow_down,
-                          size: 16, color: Color(0xFF888888)),
-                      style: const TextStyle(
-                          fontSize: 14, color: Color(0xFF0A0A0A)),
-                      items: _categories
-                          .map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(c),
-                              ))
-                          .toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _category = v);
-                      },
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _field('Stock', _stockCtrl,
+                            inputType: TextInputType.number),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 36),
-
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A0A0A),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    disabledBackgroundColor: const Color(0xFF888888),
-                    shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.zero),
-                  ),
-                  child: Text(
-                    _saving
-                        ? 'SAVING...'
-                        : (_isEdit ? 'SAVE CHANGES' : 'PUBLISH PRODUCT'),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2.5,
+            ),
+            if (!_isEdit) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3CD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: Color(0xFFB45309)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'New products are reviewed by admin before appearing to buyers.',
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: const Color(0xFF92400E)),
+                      ),
                     ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0A0A0A),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  disabledBackgroundColor: const Color(0xFF555555),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _saving
+                      ? const SizedBox(
+                          key: ValueKey('spinner'),
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.5, color: Colors.white),
+                        )
+                      : Text(
+                          key: ValueKey(_isEdit ? 'save' : 'publish'),
+                          _isEdit ? 'SAVE CHANGES' : 'SUBMIT FOR REVIEW',
+                          style: GoogleFonts.commissioner(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.5,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Sections ──────────────────────────────────────────────────────────────
+
+  Widget _imageSection() {
+    final hasPickedImage = _pickedBytes != null;
+    final hasExisting = _existingImageUrl.isNotEmpty;
+
+    return _card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _sectionLabel('PRODUCT IMAGE'),
+              TextButton.icon(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.photo_library_outlined,
+                    size: 15, color: Color(0xFF0A0A0A)),
+                label: Text(
+                  hasPickedImage || hasExisting ? 'CHANGE' : 'PICK IMAGE',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                    color: const Color(0xFF0A0A0A),
                   ),
+                ),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  backgroundColor: const Color(0xFFF0F0F0),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: _pickImage,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                width: double.infinity,
+                height: 180,
+                child: hasPickedImage
+                    ? Image.memory(_pickedBytes!, fit: BoxFit.cover)
+                    : hasExisting
+                        ? Image.network(
+                            _existingImageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _imagePlaceholder(),
+                          )
+                        : _imagePlaceholder(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _imagePlaceholder() {
+    return Container(
+      color: const Color(0xFFF5F4F2),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.add_photo_alternate_outlined,
+              color: Color(0xFFCCCCCC), size: 40),
+          const SizedBox(height: 10),
+          Text(
+            'Tap to pick an image',
+            style: GoogleFonts.inter(
+                fontSize: 13, color: const Color(0xFFBBBBBB)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'CATEGORY',
+          style: GoogleFonts.commissioner(
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF888888),
+            letterSpacing: 1.5,
+          ),
         ),
+        const SizedBox(height: 10),
+        _categories.isEmpty
+            ? Text('Loading...',
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: const Color(0xFFAAAAAA)))
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _categories.map((cat) {
+                  final id = cat['id'] as int;
+                  final name = cat['name'] as String;
+                  final selected = _selectedCategoryId == id;
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedCategoryId = id;
+                      _selectedCategoryName = name;
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFF0A0A0A)
+                            : const Color(0xFFF5F4F2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        name,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: selected
+                              ? Colors.white
+                              : const Color(0xFF555555),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+      ],
+    );
+  }
+
+  // ── Shared helpers ────────────────────────────────────────────────────────
+
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: child,
+    );
+  }
+
+  Widget _sectionLabel(String label) {
+    return Text(
+      label,
+      style: GoogleFonts.commissioner(
+        fontSize: 9,
+        fontWeight: FontWeight.w700,
+        color: const Color(0xFF888888),
+        letterSpacing: 2.5,
       ),
     );
   }
@@ -278,42 +468,46 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
     int maxLines = 1,
     String? hint,
     TextInputType? inputType,
+    String? prefix,
   }) {
-    return StatefulBuilder(
-      builder: (context, localSet) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF888888),
-              letterSpacing: 1.5,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: ctrl,
-            maxLines: maxLines,
-            keyboardType: inputType,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF0A0A0A)),
-            onChanged: (_) => localSet(() {}),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: hint,
-              hintStyle: const TextStyle(
-                  fontSize: 13, color: Color(0xFFCCCCCC)),
-              contentPadding: const EdgeInsets.only(bottom: 8),
-              enabledBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFDDDDDD), width: 1),
-              ),
-              focusedBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF0A0A0A), width: 1.5),
-              ),
-            ),
-          ),
-        ],
+    return TextField(
+      controller: ctrl,
+      maxLines: maxLines,
+      keyboardType: inputType,
+      style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF0A0A0A)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle:
+            GoogleFonts.inter(fontSize: 14, color: const Color(0xFF999999)),
+        floatingLabelStyle: GoogleFonts.commissioner(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF0A0A0A),
+          letterSpacing: 1,
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        hintText: hint,
+        hintStyle:
+            GoogleFonts.inter(fontSize: 13, color: const Color(0xFFCCCCCC)),
+        prefixText: prefix,
+        prefixStyle:
+            GoogleFonts.inter(fontSize: 15, color: const Color(0xFF0A0A0A)),
+        filled: true,
+        fillColor: const Color(0xFFF7F6F4),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFF0A0A0A), width: 1.5),
+        ),
       ),
     );
   }

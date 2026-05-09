@@ -3,9 +3,9 @@ import '../services/unified_auth_service.dart';
 
 /// Compact role switcher for users with multiple roles
 class RoleSwitcher extends StatelessWidget {
-  final List<UnifiedAuthService.UserRole> availableRoles;
-  final UnifiedAuthService.UserRole currentRole;
-  final Function(UnifiedAuthService.UserRole) onRoleChanged;
+  final List<UserRole> availableRoles;
+  final UserRole currentRole;
+  final Function(UserRole) onRoleChanged;
 
   const RoleSwitcher({
     super.key,
@@ -27,7 +27,7 @@ class RoleSwitcher extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -65,9 +65,9 @@ class RoleSwitcher extends StatelessWidget {
 
 /// Dialog version of role switcher for more prominent role selection
 class RoleSwitcherDialog extends StatelessWidget {
-  final List<UnifiedAuthService.UserRole> availableRoles;
-  final UnifiedAuthService.UserRole currentRole;
-  final Function(UnifiedAuthService.UserRole) onRoleChanged;
+  final List<UserRole> availableRoles;
+  final UserRole currentRole;
+  final Function(UserRole) onRoleChanged;
 
   const RoleSwitcherDialog({
     super.key,
@@ -78,9 +78,9 @@ class RoleSwitcherDialog extends StatelessWidget {
 
   static Future<void> show(
     BuildContext context,
-    List<UnifiedAuthService.UserRole> availableRoles,
-    UnifiedAuthService.UserRole currentRole,
-    Function(UnifiedAuthService.UserRole) onRoleChanged,
+    List<UserRole> availableRoles,
+    UserRole currentRole,
+    Function(UserRole) onRoleChanged,
   ) {
     return showDialog(
       context: context,
@@ -105,7 +105,7 @@ class RoleSwitcherDialog extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -114,7 +114,6 @@ class RoleSwitcherDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Title
             const Text(
               'SWITCH ROLE',
               style: TextStyle(
@@ -147,7 +146,6 @@ class RoleSwitcherDialog extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Role options
             ...availableRoles.map((role) {
               final isSelected = role == currentRole;
               return GestureDetector(
@@ -196,7 +194,6 @@ class RoleSwitcherDialog extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // Close button
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
@@ -215,15 +212,17 @@ class RoleSwitcherDialog extends StatelessWidget {
     );
   }
 
-  IconData _getRoleIcon(UnifiedAuthService.UserRole role) {
+  IconData _getRoleIcon(UserRole role) {
     switch (role) {
-      case UnifiedAuthService.UserRole.buyer:
+      case UserRole.buyer:
         return Icons.shopping_bag_outlined;
-      case UnifiedAuthService.UserRole.seller:
+      case UserRole.seller:
         return Icons.storefront_outlined;
-      case UnifiedAuthService.UserRole.rider:
+      case UserRole.rider:
         return Icons.delivery_dining;
-      case UnifiedAuthService.UserRole.none:
+      case UserRole.admin:
+        return Icons.admin_panel_settings_outlined;
+      case UserRole.none:
         return Icons.person_outline;
     }
   }

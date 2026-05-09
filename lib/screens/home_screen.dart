@@ -771,7 +771,7 @@ class _CategoryCardState extends State<_CategoryCard> {
                     height: imgH,
                     width: double.infinity,
                     color: _hovered
-                        ? const Color(0xFF0A0A0A).withOpacity(0.18)
+                        ? const Color(0xFF0A0A0A).withValues(alpha:0.18)
                         : Colors.transparent,
                   ),
                 ],
@@ -898,7 +898,7 @@ class _ProductCardState extends State<_ProductCard> {
                     height: imgH,
                     width: double.infinity,
                     color: _hovered
-                        ? const Color(0xFF0A0A0A).withOpacity(0.06)
+                        ? const Color(0xFF0A0A0A).withValues(alpha:0.06)
                         : Colors.transparent,
                   ),
                 ],
@@ -978,8 +978,8 @@ class _AddToCartButtonState extends State<_AddToCartButton> {
           duration: const Duration(milliseconds: 180),
           padding: EdgeInsets.symmetric(
               vertical: widget.isMobile ? 8 : 10),
-          color: _hovered ? const Color(0xFF0A0A0A) : Colors.white,
           decoration: BoxDecoration(
+            color: _hovered ? const Color(0xFF0A0A0A) : Colors.white,
             border: Border.all(color: const Color(0xFF0A0A0A), width: 1),
           ),
           child: Center(

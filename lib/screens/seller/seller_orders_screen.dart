@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 import '../../services/seller_auth_service.dart';
@@ -16,13 +17,21 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
   bool _loading = true;
 
   static const _filters = [
-    ('all', 'ALL'),
-    (Order.toPay, 'TO PAY'),
-    (Order.toShip, 'TO SHIP'),
-    (Order.shipped, 'SHIPPED'),
-    (Order.toReceive, 'TO RECEIVE'),
-    (Order.completed, 'COMPLETED'),
+    ('all', 'All'),
+    (Order.toPay, 'To Pay'),
+    (Order.toShip, 'To Ship'),
+    (Order.shipped, 'Shipped'),
+    (Order.toReceive, 'To Receive'),
+    (Order.completed, 'Completed'),
   ];
+
+  static const _statusColors = {
+    Order.toPay: Color(0xFFF59E0B),
+    Order.toShip: Color(0xFF3B82F6),
+    Order.shipped: Color(0xFF6366F1),
+    Order.toReceive: Color(0xFF14B8A6),
+    Order.completed: Color(0xFF10B981),
+  };
 
   @override
   void initState() {
@@ -52,24 +61,22 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: const Color(0xFFF4F3F0),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFF0A0A0A),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new,
-              color: Color(0xFF0A0A0A), size: 16),
+              color: Colors.white, size: 16),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'ORDERS',
-          style: TextStyle(
-            color: Color(0xFF0A0A0A),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.commissioner(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
             letterSpacing: 3,
           ),
         ),
@@ -83,49 +90,7 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
             )
           : Column(
               children: [
-                // Filter tabs
-                Container(
-                  color: Colors.white,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    child: Row(
-                      children: _filters.map((f) {
-                        final active = _filter == f.$1;
-                        return GestureDetector(
-                          onTap: () => setState(() => _filter = f.$1),
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
-                            decoration: active
-                                ? const BoxDecoration(
-                                    color: Color(0xFF0A0A0A))
-                                : BoxDecoration(
-                                    color: Colors.transparent,
-                                    border: Border.all(
-                                        color: const Color(0xFFDDDDDD))),
-                            child: Text(
-                              f.$2,
-                              style: TextStyle(
-                                fontSize: 8,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.5,
-                                color: active
-                                    ? Colors.white
-                                    : const Color(0xFF555555),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-                Container(height: 1, color: const Color(0xFFEEEEEE)),
-
-                // Order list
+                _filterBar(),
                 Expanded(
                   child: _filtered.isEmpty
                       ? _emptyState()
@@ -133,15 +98,11 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
                           onRefresh: _load,
                           color: const Color(0xFF0A0A0A),
                           child: ListView.separated(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: isMobile ? 16 : 48,
-                              vertical: 20,
-                            ),
+                            padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
                             itemCount: _filtered.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 12),
-                            itemBuilder: (_, i) =>
-                                _orderCard(_filtered[i], isMobile),
+                            itemBuilder: (_, i) => _orderCard(_filtered[i]),
                           ),
                         ),
                 ),
@@ -150,76 +111,139 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
     );
   }
 
+  Widget _filterBar() {
+    return Container(
+      color: const Color(0xFF0A0A0A),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Row(
+          children: _filters.map((f) {
+            final active = _filter == f.$1;
+            final color =
+                _statusColors[f.$1] ?? Colors.white;
+            return GestureDetector(
+              onTap: () => setState(() => _filter = f.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: active
+                      ? (f.$1 == 'all' ? Colors.white : color)
+                      : Colors.white.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  f.$2,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: active
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: active
+                        ? (f.$1 == 'all'
+                            ? const Color(0xFF0A0A0A)
+                            : Colors.white)
+                        : Colors.white.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Widget _emptyState() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.receipt_long_outlined,
-              size: 48, color: Color(0xFFCCCCCC)),
-          SizedBox(height: 20),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEEEEE),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Icon(Icons.receipt_long_outlined,
+                size: 32, color: Color(0xFFCCCCCC)),
+          ),
+          const SizedBox(height: 20),
           Text(
             'NO ORDERS',
-            style: TextStyle(
-              fontSize: 10,
+            style: GoogleFonts.commissioner(
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: Color(0xFFAAAAAA),
+              color: const Color(0xFFAAAAAA),
               letterSpacing: 3,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Orders will appear here once placed',
-            style: TextStyle(fontSize: 12, color: Color(0xFFBBBBBB)),
+            style: GoogleFonts.inter(
+                fontSize: 13, color: const Color(0xFFBBBBBB)),
           ),
         ],
       ),
     );
   }
 
-  Widget _orderCard(Order order, bool isMobile) {
+  Widget _orderCard(Order order) {
     final actions = _nextActions(order.status);
+    final statusColor =
+        _statusColors[order.status] ?? const Color(0xFF888888);
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
+          // Order ID + status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 'ORDER #${order.id.substring(order.id.length > 6 ? order.id.length - 6 : 0)}',
-                style: const TextStyle(
+                style: GoogleFonts.commissioner(
                   fontSize: 9,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF888888),
+                  color: const Color(0xFF999999),
                   letterSpacing: 2,
                 ),
               ),
-              _statusBadge(order.status),
+              _statusPill(order.status, statusColor),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Product + image
+          // Product row
           Row(
             children: [
               if (order.productImageUrl.isNotEmpty)
-                Container(
-                  width: 52,
-                  height: 52,
-                  color: const Color(0xFFF2F2F2),
-                  margin: const EdgeInsets.only(right: 14),
-                  child: Image.network(
-                    order.productImageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
-                        Icons.image_outlined,
-                        color: Color(0xFFCCCCCC),
-                        size: 20),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    color: const Color(0xFFF2F2F2),
+                    margin: const EdgeInsets.only(right: 14),
+                    child: Image.network(
+                      order.productImageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                          Icons.image_outlined,
+                          color: Color(0xFFCCCCCC),
+                          size: 22),
+                    ),
                   ),
                 ),
               Expanded(
@@ -228,17 +252,17 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
                   children: [
                     Text(
                       order.productName,
-                      style: const TextStyle(
-                        fontSize: 13,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0A0A0A),
+                        color: const Color(0xFF0A0A0A),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Qty: ${order.quantity}  ·  ₱${order.total.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                          fontSize: 11, color: Color(0xFF777777)),
+                      'Qty ${order.quantity}  ·  ₱${order.total.toStringAsFixed(0)}',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: const Color(0xFF777777)),
                     ),
                   ],
                 ),
@@ -249,35 +273,38 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
           Container(height: 1, color: const Color(0xFFF0F0F0)),
           const SizedBox(height: 12),
 
-          // Buyer info
-          _infoRow('BUYER', order.buyerEmail),
-          const SizedBox(height: 6),
-          _infoRow('ADDRESS', order.deliveryAddress),
-          const SizedBox(height: 6),
+          // Info rows
+          _infoRow(Icons.person_outline, order.buyerEmail),
+          const SizedBox(height: 8),
+          _infoRow(Icons.location_on_outlined, order.deliveryAddress),
+          const SizedBox(height: 8),
           _infoRow(
-            'DATE',
+            Icons.calendar_today_outlined,
             '${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}',
           ),
 
-          // Payment release banner
+          // Completed banner
           if (order.status == Order.completed) ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: const Color(0xFF0A0A0A),
-              child: const Row(
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
                 children: [
-                  Icon(Icons.check_circle_outline,
-                      color: Colors.white, size: 14),
-                  SizedBox(width: 8),
+                  const Icon(Icons.check_circle_outline,
+                      color: Color(0xFF10B981), size: 16),
+                  const SizedBox(width: 8),
                   Text(
-                    'PAYMENT RELEASED — TRANSACTION COMPLETE',
-                    style: TextStyle(
-                      fontSize: 8,
+                    'PAYMENT RELEASED — COMPLETE',
+                    style: GoogleFonts.commissioner(
+                      fontSize: 9,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                      color: Colors.white,
+                      letterSpacing: 1,
+                      color: const Color(0xFF10B981),
                     ),
                   ),
                 ],
@@ -289,11 +316,13 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 16),
             Row(
-              children: actions.map((a) {
+              children: actions.asMap().entries.map((e) {
+                final idx = e.key;
+                final a = e.value;
                 return Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(
-                        right: actions.indexOf(a) < actions.length - 1 ? 8 : 0),
+                        right: idx < actions.length - 1 ? 8 : 0),
                     child: ElevatedButton(
                       onPressed: () => _updateStatus(order, a.$1),
                       style: ElevatedButton.styleFrom(
@@ -307,15 +336,17 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
                         side: a.$2
                             ? null
                             : const BorderSide(
-                                color: Color(0xFF0A0A0A), width: 1),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.zero),
+                                color: Color(0xFFDDDDDD), width: 1),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                       child: Text(
                         a.$3,
-                        style: const TextStyle(
-                          fontSize: 9,
+                        style: GoogleFonts.commissioner(
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 1.5,
                         ),
@@ -331,6 +362,44 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
     );
   }
 
+  Widget _statusPill(String status, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        Order.statusLabel(status).toUpperCase(),
+        style: GoogleFonts.commissioner(
+          fontSize: 8,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 14, color: const Color(0xFFCCCCCC)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            style: GoogleFonts.inter(
+                fontSize: 12, color: const Color(0xFF555555)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
   // Returns (newStatus, isPrimary, label)
   List<(String, bool, String)> _nextActions(String status) {
     switch (status) {
@@ -340,55 +409,8 @@ class _SellerOrdersScreenState extends State<SellerOrdersScreen> {
         return [(Order.shipped, true, 'MARK AS SHIPPED')];
       case Order.shipped:
         return [(Order.toReceive, true, 'OUT FOR DELIVERY')];
-      case Order.toReceive:
-        return [];
       default:
         return [];
     }
-  }
-
-  Widget _statusBadge(String status) {
-    final isComplete = status == Order.completed;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      color: isComplete ? const Color(0xFF0A0A0A) : const Color(0xFFF0F0F0),
-      child: Text(
-        Order.statusLabel(status).toUpperCase(),
-        style: TextStyle(
-          fontSize: 7,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1,
-          color: isComplete ? Colors.white : const Color(0xFF555555),
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 68,
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFAAAAAA),
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF555555)),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
   }
 }

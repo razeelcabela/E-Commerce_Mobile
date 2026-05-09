@@ -52,8 +52,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
 class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
-  final List<Widget>? actions;
-  const _AdminAppBar({required this.title, this.actions});
+  const _AdminAppBar({required this.title});
 
   @override
   Size get preferredSize => const Size.fromHeight(56);
@@ -72,7 +71,6 @@ class _AdminAppBar extends StatelessWidget implements PreferredSizeWidget {
         ],
       ),
       actions: [
-        if (actions != null) ...actions!,
         IconButton(
           icon: const Icon(Icons.logout, color: Color(0xFF888888), size: 20),
           onPressed: () async {
@@ -228,7 +226,7 @@ class _OverviewTabState extends State<_OverviewTab> {
         children: [
           Container(
             width: 36, height: 36,
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: color.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 12),
@@ -388,7 +386,7 @@ class _UsersTabState extends State<_UsersTab> with SingleTickerProviderStateMixi
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _statusBadge(status.toUpperCase(), _statusColor(status).withOpacity(0.12), _statusColor(status)),
+                _statusBadge(status.toUpperCase(), _statusColor(status).withValues(alpha:0.12), _statusColor(status)),
                 const SizedBox(height: 4),
                 Text(u['role'] ?? '', style: const TextStyle(color: Color(0xFF888888), fontSize: 10)),
               ],
@@ -421,7 +419,7 @@ class _UsersTabState extends State<_UsersTab> with SingleTickerProviderStateMixi
             ),
             title: Text(s['store_name'] ?? 'Unknown Store', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             subtitle: Text(user?['email'] ?? s['contact_email'] ?? '', style: const TextStyle(color: Color(0xFF888888), fontSize: 11)),
-            trailing: _statusBadge(status.toUpperCase(), _statusColor(status).withOpacity(0.12), _statusColor(status)),
+            trailing: _statusBadge(status.toUpperCase(), _statusColor(status).withValues(alpha:0.12), _statusColor(status)),
             onTap: () => _showSellerActions(s),
           ),
         );
@@ -456,7 +454,7 @@ class _UsersTabState extends State<_UsersTab> with SingleTickerProviderStateMixi
             ),
             subtitle: Text('${r['vehicle_type'] ?? 'motorcycle'} · ${r['license_number'] ?? ''}',
                 style: const TextStyle(color: Color(0xFF888888), fontSize: 11)),
-            trailing: _statusBadge(status.toUpperCase(), _statusColor(status).withOpacity(0.12), _statusColor(status)),
+            trailing: _statusBadge(status.toUpperCase(), _statusColor(status).withValues(alpha:0.12), _statusColor(status)),
             onTap: () => _showRiderActions(r),
           ),
         );
@@ -710,7 +708,7 @@ class _OrdersTabState extends State<_OrdersTab> {
                                     const Spacer(),
                                     _statusBadge(
                                       status.toUpperCase(),
-                                      _statusColor(status).withOpacity(0.1),
+                                      _statusColor(status).withValues(alpha:0.1),
                                       _statusColor(status),
                                     ),
                                   ],
@@ -879,7 +877,7 @@ class _ProductsTabState extends State<_ProductsTab> {
                                 ),
                                 trailing: _statusBadge(
                                   status.toUpperCase(),
-                                  _statusColor(status).withOpacity(0.12),
+                                  _statusColor(status).withValues(alpha:0.12),
                                   _statusColor(status),
                                 ),
                                 onTap: () => _showProductActions(p),

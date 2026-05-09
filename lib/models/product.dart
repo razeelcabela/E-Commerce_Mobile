@@ -22,9 +22,13 @@ class Product {
       name: json['name'] ?? '',
       price: (json['price'] is int) ? (json['price'] as int).toDouble() : (json['price'] as double?) ?? 0.0,
       description: json['description'] ?? '',
-      category: json['category'] ?? 'Uncategorized',
-      imageUrl: json['image_url'] ?? '',
+      category: json['category'] as String? ?? 'Uncategorized',
+      imageUrl: _firstImageUrl(json),
     );
+  }
+
+  static String _firstImageUrl(Map<String, dynamic> json) {
+    return json['image_url'] as String? ?? '';
   }
 
   Product copyWith({

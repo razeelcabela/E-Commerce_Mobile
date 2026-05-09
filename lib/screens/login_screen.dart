@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
-// http is still used by _LocationPickerSheet for PSGC API calls
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -51,14 +50,14 @@ class _LoginScreenState extends State<LoginScreen>
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 900),
     );
     _fade = CurvedAnimation(
       parent: _ctrl,
       curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
     );
     _slide = Tween<Offset>(
-      begin: const Offset(0, 0.1),
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _ctrl,
@@ -87,30 +86,20 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> login() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
-      );
+      _showSnack('Please enter email and password');
       return;
     }
-
     setState(() => loading = true);
 
-    final error = await AuthService.login(
-      emailCtrl.text,
-      passCtrl.text,
-    );
+    final error = await AuthService.login(emailCtrl.text, passCtrl.text);
 
     if (!mounted) return;
     setState(() => loading = false);
 
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      _showSnack(error);
       return;
     }
-
-    // Navigate to auth loading screen to determine user role
     Navigator.of(context).pushReplacementNamed('/auth-loading');
   }
 
@@ -120,27 +109,20 @@ class _LoginScreenState extends State<LoginScreen>
         signupEmailCtrl.text.isEmpty ||
         phoneCtrl.text.isEmpty ||
         signupPassCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
-      );
+      _showSnack('Please fill all required fields');
       return;
     }
     if (!_emailPattern.hasMatch(signupEmailCtrl.text.trim())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email address')),
-      );
+      _showSnack('Enter a valid email address');
       return;
     }
     if (signupPassCtrl.text != confirmPassCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
+      _showSnack('Passwords do not match');
       return;
     }
 
     setState(() => loading = true);
 
-    // Save user to Supabase
     final error = await AuthService.signUp(
       email: signupEmailCtrl.text,
       password: signupPassCtrl.text,
@@ -153,13 +135,10 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (error != null) {
       setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error)),
-      );
+      _showSnack(error);
       return;
     }
 
-    // Persist address for faster checkout (optional)
     await AddressService.saveAddress({
       'houseNumber': houseNumberCtrl.text.trim(),
       'streetName': streetNameCtrl.text.trim(),
@@ -186,8 +165,21 @@ class _LoginScreenState extends State<LoginScreen>
       loading = false;
       isLogin = true;
     });
+    _showSnack('Account created — please sign in');
+  }
+
+  void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account created — please sign in')),
+      SnackBar(
+        content: Text(
+          message,
+          style: GoogleFonts.inter(fontSize: 13, color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF0A0A0A),
+        behavior: SnackBarBehavior.floating,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
@@ -216,94 +208,756 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = MediaQuery.of(context).size.width < 720;
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor:
+          isMobile ? const Color(0xFF0A0A0A) : const Color(0xFFF4F3F0),
+      resizeToAvoidBottomInset: true,
       body: FadeTransition(
         opacity: _fade,
-        child: SlideTransition(
-          position: _slide,
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 24 : 0,
-                vertical: 48,
+        child: isMobile ? _mobileLayout() : _desktopLayout(),
+      ),
+    );
+  }
+
+  // ── Mobile ──────────────────────────────────────────────────────────────────
+
+  Widget _mobileLayout() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SafeArea(
+          bottom: false,
+          child: SlideTransition(
+            position: _slide,
+            child: _mobileBrandHeader(),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
               ),
-              child: SizedBox(
-                width: 420,
-                child: Column(
-              children: [
-                Text(
-                  'VARÓN',
-                  style: GoogleFonts.commissioner(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w300,
-                    color: const Color(0xFF0A0A0A),
-                    letterSpacing: 8,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'PREMIUM MINIMALIST FASHION',
-                  style: GoogleFonts.commissioner(
-                    fontSize: 8,
-                    color: const Color(0xFF999999),
-                    letterSpacing: 4,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(36),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _tab('LOGIN', isLogin, () => toggle(true)),
-                          const SizedBox(width: 32),
-                          _tab('SIGN UP', !isLogin, () => toggle(false)),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      Container(height: 1, color: const Color(0xFFEEEEEE)),
-                      const SizedBox(height: 32),
-                      if (isLogin) ..._loginFields() else ..._signupFields(),
-                      const SizedBox(height: 28),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: loading ? null : (isLogin ? login : signup),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A0A0A),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            disabledBackgroundColor: const Color(0xFF888888),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                          ),
-                          child: Text(
-                            loading
-                                ? 'PLEASE WAIT...'
-                                : (isLogin ? 'SIGN IN' : 'CREATE ACCOUNT'),
-                            style: GoogleFonts.commissioner(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 2.5,
-                            ),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(28),
+                topRight: Radius.circular(28),
+              ),
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.fromLTRB(28, 32, 28, 48),
+                child: _mobileFormContent(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mobileBrandHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 52, 28, 40),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'VARÓN',
+            style: GoogleFonts.commissioner(
+              fontSize: 20,
+              fontWeight: FontWeight.w200,
+              color: Colors.white,
+              letterSpacing: 10,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            'PREMIUM MINIMALIST FASHION',
+            style: GoogleFonts.commissioner(
+              fontSize: 7,
+              color: Colors.white.withValues(alpha: 0.35),
+              letterSpacing: 4,
+            ),
+          ),
+          const SizedBox(height: 36),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, anim) =>
+                FadeTransition(opacity: anim, child: child),
+            child: Text(
+              key: ValueKey(isLogin ? 'h_login' : 'h_signup'),
+              isLogin ? 'Welcome\nback.' : 'Create your\naccount.',
+              style: GoogleFonts.commissioner(
+                fontSize: 34,
+                fontWeight: FontWeight.w200,
+                color: Colors.white,
+                height: 1.2,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileFormContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Pill tab switcher
+        _mobilePillTabs(),
+        const SizedBox(height: 32),
+
+        // Animated form swap
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) =>
+              FadeTransition(opacity: anim, child: child),
+          child: isLogin
+              ? Column(
+                  key: const ValueKey('m_login'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ..._mobileLoginFields(),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {},
+                        child: Text(
+                          'Forgot password?',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF888888),
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                )
+              : Column(
+                  key: const ValueKey('m_signup'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _mobileSignupFields(),
                 ),
+        ),
+
+        const SizedBox(height: 32),
+        _mobileSubmitButton(),
+
+        if (!isLogin) ...[
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              'By signing up you agree to our Terms of Service\nand Privacy Policy.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: const Color(0xFFAAAAAA),
+                height: 1.7,
+              ),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 28),
+        Center(
+          child: GestureDetector(
+            onTap: () => toggle(!isLogin),
+            child: RichText(
+              text: TextSpan(
+                style: GoogleFonts.inter(
+                    fontSize: 13, color: const Color(0xFF888888)),
+                children: [
+                  TextSpan(
+                    text: isLogin
+                        ? "Don't have an account?  "
+                        : 'Already have an account?  ',
+                  ),
+                  TextSpan(
+                    text: isLogin ? 'Sign up' : 'Sign in',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0A0A0A),
+                    ),
+                  ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mobilePillTabs() {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0EE),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        children: [
+          // Sliding white pill
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            alignment:
+                isLogin ? Alignment.centerLeft : Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              child: Container(
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          // Tab labels
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => toggle(true),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: Text(
+                      'LOGIN',
+                      style: GoogleFonts.commissioner(
+                        fontSize: 11,
+                        fontWeight:
+                            isLogin ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: 1.5,
+                        color: isLogin
+                            ? const Color(0xFF0A0A0A)
+                            : const Color(0xFFAAAAAA),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => toggle(false),
+                  behavior: HitTestBehavior.opaque,
+                  child: Center(
+                    child: Text(
+                      'SIGN UP',
+                      style: GoogleFonts.commissioner(
+                        fontSize: 11,
+                        fontWeight:
+                            !isLogin ? FontWeight.w700 : FontWeight.w500,
+                        letterSpacing: 1.5,
+                        color: !isLogin
+                            ? const Color(0xFF0A0A0A)
+                            : const Color(0xFFAAAAAA),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _mobileLoginFields() => [
+        _mobileField('Email address', emailCtrl,
+            keyboardType: TextInputType.emailAddress),
+        const SizedBox(height: 16),
+        _mobileField('Password', passCtrl,
+            obscure: _obscureLogin,
+            onToggleObscure: () =>
+                setState(() => _obscureLogin = !_obscureLogin)),
+      ];
+
+  List<Widget> _mobileSignupFields() => [
+        Row(
+          children: [
+            Expanded(child: _mobileField('First name', firstCtrl)),
+            const SizedBox(width: 12),
+            Expanded(child: _mobileField('Last name', lastCtrl)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _mobileField('Email address', signupEmailCtrl,
+            keyboardType: TextInputType.emailAddress),
+        const SizedBox(height: 16),
+        _mobileField('Phone number', phoneCtrl,
+            keyboardType: TextInputType.phone),
+        const SizedBox(height: 16),
+        _mobileField('Password', signupPassCtrl,
+            obscure: _obscureSignupPass,
+            onToggleObscure: () =>
+                setState(() => _obscureSignupPass = !_obscureSignupPass)),
+        const SizedBox(height: 16),
+        _mobileField('Confirm password', confirmPassCtrl,
+            obscure: _obscureConfirm,
+            onToggleObscure: () =>
+                setState(() => _obscureConfirm = !_obscureConfirm)),
+
+        // Address section
+        const SizedBox(height: 36),
+        Row(
+          children: [
+            Expanded(
+                child:
+                    Container(height: 1, color: const Color(0xFFEEEEEE))),
+            const SizedBox(width: 12),
+            Column(
+              children: [
+                Text(
+                  'DELIVERY ADDRESS',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF999999),
+                    letterSpacing: 3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Optional — for faster checkout',
+                  style: GoogleFonts.inter(
+                      fontSize: 10, color: const Color(0xFFBBBBBB)),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+                child:
+                    Container(height: 1, color: const Color(0xFFEEEEEE))),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+                child: _mobileField('House / Unit no.', houseNumberCtrl)),
+            const SizedBox(width: 12),
+            Expanded(child: _mobileField('Street', streetNameCtrl)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _mobileLocationField(),
+      ];
+
+  Widget _mobileLocationField() {
+    final hasLocation = _locationDisplay.isNotEmpty;
+    return GestureDetector(
+      onTap: _openLocationPicker,
+      child: Container(
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F6F4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: hasLocation
+                ? const Color(0xFF0A0A0A)
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                hasLocation
+                    ? _locationDisplay
+                    : 'Location (barangay, city, province)',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: hasLocation
+                      ? const Color(0xFF0A0A0A)
+                      : const Color(0xFF999999),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              hasLocation
+                  ? Icons.check_circle_outline
+                  : Icons.keyboard_arrow_right,
+              size: 18,
+              color: hasLocation
+                  ? const Color(0xFF0A0A0A)
+                  : const Color(0xFFBBBBBB),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileField(
+    String label,
+    TextEditingController ctrl, {
+    bool obscure = false,
+    VoidCallback? onToggleObscure,
+    TextInputType? keyboardType,
+  }) {
+    return TextField(
+      controller: ctrl,
+      obscureText: obscure,
+      keyboardType: keyboardType,
+      style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF0A0A0A)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(
+          fontSize: 14,
+          color: const Color(0xFF999999),
+        ),
+        floatingLabelStyle: GoogleFonts.commissioner(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF0A0A0A),
+          letterSpacing: 1,
+        ),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        filled: true,
+        fillColor: const Color(0xFFF7F6F4),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide:
+              const BorderSide(color: Color(0xFF0A0A0A), width: 1.5),
+        ),
+        suffixIcon: onToggleObscure != null
+            ? IconButton(
+                onPressed: onToggleObscure,
+                icon: Icon(
+                  obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                  color: const Color(0xFF999999),
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+
+  Widget _mobileSubmitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: loading ? null : (isLogin ? login : signup),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0A0A0A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          disabledBackgroundColor: const Color(0xFF555555),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: loading
+              ? const SizedBox(
+                  key: ValueKey('m_spinner'),
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: Colors.white),
+                )
+              : Text(
+                  key: ValueKey(isLogin ? 'm_signin' : 'm_create'),
+                  isLogin ? 'SIGN IN' : 'CREATE ACCOUNT',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2.5,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ── Desktop ─────────────────────────────────────────────────────────────────
+
+  Widget _desktopLayout() {
+    return Row(
+      children: [
+        Expanded(flex: 5, child: _brandPanel()),
+        Expanded(
+          flex: 4,
+          child: Container(
+            color: Colors.white,
+            child: SlideTransition(
+              position: _slide,
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 56, vertical: 72),
+                child: _formContent(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _brandPanel() {
+    return Container(
+      color: const Color(0xFF0A0A0A),
+      padding: const EdgeInsets.all(60),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Brand name
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'VARÓN',
+                style: GoogleFonts.commissioner(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w200,
+                  color: Colors.white,
+                  letterSpacing: 12,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'PREMIUM MINIMALIST FASHION',
+                style: GoogleFonts.commissioner(
+                  fontSize: 8,
+                  color: Colors.white.withValues(alpha: 0.35),
+                  letterSpacing: 4,
+                ),
+              ),
+            ],
+          ),
+          // Tagline
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28,
+                height: 1,
+                color: Colors.white.withValues(alpha: 0.25),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Crafted for\nthe modern\ngentleman.',
+                style: GoogleFonts.commissioner(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w200,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                'Curated essentials. Timeless form.\nUncompromising quality.',
+                style: GoogleFonts.commissioner(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.4),
+                  letterSpacing: 0.5,
+                  height: 1.9,
+                ),
+              ),
+            ],
+          ),
+          // Footer
+          Text(
+            '© VARÓN 2025',
+            style: GoogleFonts.commissioner(
+              fontSize: 9,
+              color: Colors.white.withValues(alpha: 0.2),
+              letterSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared form ─────────────────────────────────────────────────────────────
+
+  Widget _formContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Tab row
+        Row(
+          children: [
+            _tab('LOGIN', isLogin, () => toggle(true)),
+            const SizedBox(width: 32),
+            _tab('SIGN UP', !isLogin, () => toggle(false)),
+          ],
+        ),
+        const SizedBox(height: 36),
+
+        // Animated form swap
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, anim) =>
+              FadeTransition(opacity: anim, child: child),
+          child: isLogin
+              ? Column(
+                  key: const ValueKey('login'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ..._loginFields(),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: GestureDetector(
+                          onTap: () {},
+                          child: Text(
+                            'Forgot password?',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF888888),
+                              decoration: TextDecoration.underline,
+                              decorationColor: const Color(0xFFCCCCCC),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  key: const ValueKey('signup'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: _signupFields(),
+                ),
+        ),
+
+        const SizedBox(height: 36),
+        _submitButton(),
+
+        if (!isLogin) ...[
+          const SizedBox(height: 18),
+          Center(
+            child: Text(
+              'By creating an account you agree to our\nTerms of Service and Privacy Policy.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                color: const Color(0xFFAAAAAA),
+                height: 1.7,
+              ),
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 24),
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isLogin
+                    ? "Don't have an account?  "
+                    : 'Already have an account?  ',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: const Color(0xFF888888),
+                ),
+              ),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => toggle(!isLogin),
+                  child: Text(
+                    isLogin ? 'Sign up' : 'Sign in',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF0A0A0A),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _submitButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: loading ? null : (isLogin ? login : signup),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0A0A0A),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          disabledBackgroundColor: const Color(0xFF444444),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          child: loading
+              ? const SizedBox(
+                  key: ValueKey('spinner'),
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(
+                  key: ValueKey(isLogin ? 'signin' : 'create'),
+                  isLogin ? 'SIGN IN' : 'CREATE ACCOUNT',
+                  style: GoogleFonts.commissioner(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2.5,
+                  ),
+                ),
         ),
       ),
     );
@@ -315,21 +969,25 @@ class _LoginScreenState extends State<LoginScreen>
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
               style: GoogleFonts.commissioner(
                 fontSize: 10,
-                fontWeight: FontWeight.w700,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
                 letterSpacing: 2,
-                color: active ? const Color(0xFF0A0A0A) : const Color(0xFFBBBBBB),
+                color: active
+                    ? const Color(0xFF0A0A0A)
+                    : const Color(0xFFBBBBBB),
               ),
             ),
             const SizedBox(height: 6),
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
               height: 1.5,
-              width: active ? 32 : 0,
+              width: active ? 36 : 0,
               color: const Color(0xFF0A0A0A),
             ),
           ],
@@ -338,14 +996,21 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
+  // ── Fields ──────────────────────────────────────────────────────────────────
+
   List<Widget> _loginFields() => [
-        _field('Email address', emailCtrl),
-        const SizedBox(height: 20),
+        _field(
+          'Email address',
+          emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 24),
         _field(
           'Password',
           passCtrl,
           obscure: _obscureLogin,
-          onToggleObscure: () => setState(() => _obscureLogin = !_obscureLogin),
+          onToggleObscure: () =>
+              setState(() => _obscureLogin = !_obscureLogin),
         ),
       ];
 
@@ -357,11 +1022,19 @@ class _LoginScreenState extends State<LoginScreen>
             Expanded(child: _field('Last name', lastCtrl)),
           ],
         ),
-        const SizedBox(height: 20),
-        _field('Email address', signupEmailCtrl),
-        const SizedBox(height: 20),
-        _field('Phone number', phoneCtrl),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
+        _field(
+          'Email address',
+          signupEmailCtrl,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        const SizedBox(height: 24),
+        _field(
+          'Phone number',
+          phoneCtrl,
+          keyboardType: TextInputType.phone,
+        ),
+        const SizedBox(height: 24),
         _field(
           'Password',
           signupPassCtrl,
@@ -369,7 +1042,7 @@ class _LoginScreenState extends State<LoginScreen>
           onToggleObscure: () =>
               setState(() => _obscureSignupPass = !_obscureSignupPass),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _field(
           'Confirm password',
           confirmPassCtrl,
@@ -378,29 +1051,10 @@ class _LoginScreenState extends State<LoginScreen>
               setState(() => _obscureConfirm = !_obscureConfirm),
         ),
 
-        // ── Delivery Address ──────────────────────────────────────
-        const SizedBox(height: 32),
-        Container(height: 1, color: const Color(0xFFEEEEEE)),
+        // ── Address section ───────────────────────────────────────
+        const SizedBox(height: 40),
+        _sectionDivider('DELIVERY ADDRESS', 'Optional — for faster checkout'),
         const SizedBox(height: 28),
-        const Text(
-          'DELIVERY ADDRESS',
-          style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF0A0A0A),
-            letterSpacing: 3,
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Optional — used for faster checkout',
-          style: TextStyle(
-            fontSize: 9,
-            color: Color(0xFFAAAAAA),
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 20),
         Row(
           children: [
             Expanded(child: _field('House / Unit no.', houseNumberCtrl)),
@@ -408,21 +1062,53 @@ class _LoginScreenState extends State<LoginScreen>
             Expanded(child: _field('Street name', streetNameCtrl)),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         _locationField(),
       ];
+
+  Widget _sectionDivider(String title, String subtitle) {
+    return Row(
+      children: [
+        Expanded(child: Container(height: 1, color: const Color(0xFFEEEEEE))),
+        const SizedBox(width: 16),
+        Column(
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.commissioner(
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF888888),
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                fontSize: 9,
+                color: const Color(0xFFBBBBBB),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+        Expanded(child: Container(height: 1, color: const Color(0xFFEEEEEE))),
+      ],
+    );
+  }
 
   Widget _locationField() {
     final hasLocation = _locationDisplay.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'LOCATION',
-          style: TextStyle(
+          style: GoogleFonts.commissioner(
             fontSize: 9,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF888888),
+            color: const Color(0xFF888888),
             letterSpacing: 1.5,
           ),
         ),
@@ -444,7 +1130,7 @@ class _LoginScreenState extends State<LoginScreen>
                     hasLocation
                         ? _locationDisplay
                         : 'Select barangay, city, province',
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
                       color: hasLocation
                           ? const Color(0xFF0A0A0A)
@@ -477,6 +1163,7 @@ class _LoginScreenState extends State<LoginScreen>
     TextEditingController ctrl, {
     bool obscure = false,
     VoidCallback? onToggleObscure,
+    TextInputType? keyboardType,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,6 +1181,7 @@ class _LoginScreenState extends State<LoginScreen>
         TextField(
           controller: ctrl,
           obscureText: obscure,
+          keyboardType: keyboardType,
           style: GoogleFonts.inter(
             fontSize: 14,
             color: const Color(0xFF0A0A0A),
@@ -574,7 +1262,8 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
       final res = await http.get(Uri.parse(url));
       if (res.statusCode == 200 && mounted) {
         final data = json.decode(res.body) as List;
-        data.sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
+        data.sort(
+            (a, b) => (a['name'] as String).compareTo(b['name'] as String));
         setState(() => onSuccess(data));
       }
     } catch (_) {
@@ -648,7 +1337,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
       expand: false,
       builder: (_, scrollCtrl) => Column(
         children: [
-          // Handle
           Container(
             margin: const EdgeInsets.only(top: 14, bottom: 4),
             width: 32,
@@ -658,7 +1346,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Header
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 12, 20, 12),
             child: Row(
@@ -675,7 +1362,8 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 ),
                 IconButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, size: 18, color: Color(0xFF888888)),
+                  icon: const Icon(Icons.close,
+                      size: 18, color: Color(0xFF888888)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -683,7 +1371,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
             ),
           ),
           Container(height: 1, color: const Color(0xFFEEEEEE)),
-          // Scrollable content
           Expanded(
             child: SingleChildScrollView(
               controller: scrollCtrl,
@@ -706,7 +1393,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     loading: loadingProvinces,
                     items: provinces,
                     value: provinceCode,
-                    hint: regionCode == null ? 'Select region first' : 'Select province',
+                    hint: regionCode == null
+                        ? 'Select region first'
+                        : 'Select province',
                     enabled: regionCode != null && !loadingProvinces,
                     onChanged: _onProvinceChanged,
                   ),
@@ -716,7 +1405,9 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     loading: loadingCities,
                     items: cities,
                     value: cityCode,
-                    hint: provinceCode == null ? 'Select province first' : 'Select city',
+                    hint: provinceCode == null
+                        ? 'Select province first'
+                        : 'Select city',
                     enabled: provinceCode != null && !loadingCities,
                     onChanged: _onCityChanged,
                   ),
@@ -726,10 +1417,15 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     loading: loadingBarangays,
                     items: barangays,
                     value: barangayCode,
-                    hint: cityCode == null ? 'Select city first' : 'Select barangay',
+                    hint: cityCode == null
+                        ? 'Select city first'
+                        : 'Select barangay',
                     enabled: cityCode != null && !loadingBarangays,
                     onChanged: (code, name) =>
-                        setState(() { barangayCode = code; barangayName = name; }),
+                        setState(() {
+                          barangayCode = code;
+                          barangayName = name;
+                        }),
                   ),
                   if (_canConfirm) ...[
                     const SizedBox(height: 28),
@@ -765,7 +1461,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 52,
                     child: ElevatedButton(
                       onPressed: _canConfirm
                           ? () => Navigator.of(context).pop({
@@ -871,9 +1567,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                   disabledHint: Text(
                     hint,
                     style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFFDDDDDD),
-                    ),
+                        fontSize: 14, color: Color(0xFFDDDDDD)),
                   ),
                   items: enabled
                       ? items

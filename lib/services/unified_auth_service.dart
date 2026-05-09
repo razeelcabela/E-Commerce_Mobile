@@ -44,19 +44,19 @@ class UnifiedAuthService {
   /// Check if user is currently authenticated
   static Future<bool> isAuthenticated() async {
     final session = _db.auth.currentSession;
-    return session != null && session.user != null;
+    return session != null;
   }
 
   /// Get the current user's role from database
   static Future<UserRole> getUserRole() async {
     try {
       final session = _db.auth.currentSession;
-      if (session?.user == null) {
+      if (session == null) {
         developer.log('No active session found');
         return UserRole.none;
       }
 
-      final userId = session!.user!.id;
+      final userId = session.user.id;
       developer.log('Determining role for user: $userId');
 
       // Query user profile to get role

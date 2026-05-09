@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 
@@ -26,8 +27,8 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
     final all = await OrderService.getByRider(widget.riderEmail);
     final delivered =
         all.where((o) => o.status == Order.delivered).toList();
-    final total = delivered.fold<double>(
-        0.0, (sum, o) => sum + o.commission);
+    final total =
+        delivered.fold<double>(0.0, (sum, o) => sum + o.commission);
     if (!mounted) return;
     setState(() {
       _delivered = delivered;
@@ -39,128 +40,135 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: const Color(0xFFF4F3F0),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0A0A0A),
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back_ios,
+          icon: const Icon(Icons.arrow_back_ios_new,
               size: 16, color: Colors.white),
         ),
-        title: const Text(
+        title: Text(
           'MY EARNINGS',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.commissioner(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
             letterSpacing: 3,
             color: Colors.white,
           ),
         ),
-        centerTitle: true,
       ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
-                  color: Color(0xFF0A0A0A), strokeWidth: 2))
-          : CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildSummaryCard()),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
+                  color: Color(0xFF0A0A0A), strokeWidth: 1.5))
+          : RefreshIndicator(
+              onRefresh: _load,
+              color: const Color(0xFF0A0A0A),
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                      child: _summaryCard(),
+                    ),
+                  ),
+                  if (_delivered.isNotEmpty) ...[
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
+                        child: Text(
                           'DELIVERY HISTORY',
-                          style: TextStyle(
+                          style: GoogleFonts.commissioner(
                             fontSize: 9,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 3,
-                            color: Color(0xFF0A0A0A),
+                            color: const Color(0xFF888888),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Container(
-                            width: 24,
-                            height: 1,
-                            color: const Color(0xFF0A0A0A)),
-                      ],
-                    ),
-                  ),
-                ),
-                if (_delivered.isEmpty)
-                  const SliverFillRemaining(child: _EmptyEarnings())
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _earningCard(_delivered[i]),
-                        ),
-                        childCount: _delivered.length,
                       ),
                     ),
-                  ),
-              ],
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (_, i) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _earningCard(_delivered[i]),
+                          ),
+                          childCount: _delivered.length,
+                        ),
+                      ),
+                    ),
+                  ] else
+                    const SliverFillRemaining(child: _EmptyEarnings()),
+                ],
+              ),
             ),
     );
   }
 
-  Widget _buildSummaryCard() {
+  Widget _summaryCard() {
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(20),
+      ),
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'TOTAL EARNINGS',
-            style: TextStyle(
+            style: GoogleFonts.commissioner(
               fontSize: 9,
               fontWeight: FontWeight.w600,
               letterSpacing: 3,
-              color: Color(0xFF888888),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             '₱${_totalEarnings.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 40,
+            style: GoogleFonts.commissioner(
+              fontSize: 42,
               fontWeight: FontWeight.w200,
-              color: Color(0xFF0A0A0A),
+              color: Colors.white,
             ),
           ),
+          const SizedBox(height: 24),
+          Container(
+              height: 1,
+              color: Colors.white.withValues(alpha: 0.1)),
           const SizedBox(height: 20),
-          Container(height: 1, color: const Color(0xFFEEEEEE)),
-          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: _summaryItem(
-                  label: 'DELIVERIES',
+                  label: 'Deliveries',
                   value: '${_delivered.length}',
                   icon: Icons.check_circle_outline,
+                  color: const Color(0xFF10B981),
                 ),
               ),
               Expanded(
                 child: _summaryItem(
-                  label: 'COMMISSION RATE',
-                  value: '${(Order.commissionRate * 100).toInt()}%',
+                  label: 'Commission',
+                  value:
+                      '${(Order.commissionRate * 100).toInt()}%',
                   icon: Icons.percent,
+                  color: const Color(0xFF3B82F6),
                 ),
               ),
               Expanded(
                 child: _summaryItem(
-                  label: 'AVG. PER ORDER',
+                  label: 'Avg / Order',
                   value: _delivered.isEmpty
                       ? '₱0'
                       : '₱${(_totalEarnings / _delivered.length).toStringAsFixed(0)}',
                   icon: Icons.trending_up,
+                  color: const Color(0xFFF59E0B),
                 ),
               ),
             ],
@@ -170,30 +178,38 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
     );
   }
 
-  Widget _summaryItem(
-      {required String label,
-      required String value,
-      required IconData icon}) {
+  Widget _summaryItem({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: const Color(0xFF0A0A0A)),
-        const SizedBox(height: 6),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 17, color: color),
+        ),
+        const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w300,
-            color: Color(0xFF0A0A0A),
+          style: GoogleFonts.commissioner(
+            fontSize: 17,
+            fontWeight: FontWeight.w400,
+            color: Colors.white,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 3),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 7,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF888888),
-            letterSpacing: 1.5,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: Colors.white.withValues(alpha: 0.4),
           ),
           textAlign: TextAlign.center,
         ),
@@ -203,16 +219,22 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
 
   Widget _earningCard(Order order) {
     return Container(
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
-            color: const Color(0xFFF1F8E9),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: const Icon(Icons.check,
-                size: 18, color: Color(0xFF2E7D32)),
+                size: 20, color: Color(0xFF10B981)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -221,19 +243,19 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
               children: [
                 Text(
                   order.productName,
-                  style: const TextStyle(
+                  style: GoogleFonts.inter(
                     fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF0A0A0A),
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF0A0A0A),
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   order.deliveryAddress,
-                  style: const TextStyle(
-                      fontSize: 11, color: Color(0xFF888888)),
+                  style: GoogleFonts.inter(
+                      fontSize: 11, color: const Color(0xFF888888)),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -246,17 +268,17 @@ class _RiderEarningsScreenState extends State<RiderEarningsScreen> {
             children: [
               Text(
                 '+ ₱${order.commission.toStringAsFixed(2)}',
-                style: const TextStyle(
+                style: GoogleFonts.commissioner(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF2E7D32),
+                  color: const Color(0xFF10B981),
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 'of ₱${order.total.toStringAsFixed(2)}',
-                style: const TextStyle(
-                    fontSize: 10, color: Color(0xFFAAAAAA)),
+                style: GoogleFonts.inter(
+                    fontSize: 10, color: const Color(0xFFAAAAAA)),
               ),
             ],
           ),
@@ -271,24 +293,35 @@ class _EmptyEarnings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.payments_outlined,
-              size: 48, color: Color(0xFFCCCCCC)),
-          SizedBox(height: 16),
-          Text(
-            'No earnings yet',
-            style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFFAAAAAA),
-                letterSpacing: 1),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEEEEEE),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: const Icon(Icons.payments_outlined,
+                size: 36, color: Color(0xFFCCCCCC)),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 20),
+          Text(
+            'NO EARNINGS YET',
+            style: GoogleFonts.commissioner(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFFAAAAAA),
+              letterSpacing: 3,
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             'Complete deliveries to start earning',
-            style: TextStyle(fontSize: 11, color: Color(0xFFCCCCCC)),
+            style: GoogleFonts.inter(
+                fontSize: 12, color: const Color(0xFFBBBBBB)),
           ),
         ],
       ),

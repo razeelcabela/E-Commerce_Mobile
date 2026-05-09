@@ -10,13 +10,11 @@ class SupabaseServiceEnhanced {
     try {
       debugPrint('🔍 Testing Supabase connectivity...');
 
-      // Try to get current session
-      final session = client.auth.currentSession;
       debugPrint('✅ Supabase client is initialized');
 
       // Attempt a real query to verify connection
       try {
-        final result = await client.from('users').select().limit(1);
+        await client.from('users').select().limit(1);
         debugPrint('✅ Database connection successful - query returned');
         return true;
       } on PostgrestException catch (e) {

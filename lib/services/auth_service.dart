@@ -1,6 +1,6 @@
 import 'dart:developer' as developer;
-import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'io_shim.dart' if (dart.library.html) 'io_shim_web.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import 'address_service.dart';

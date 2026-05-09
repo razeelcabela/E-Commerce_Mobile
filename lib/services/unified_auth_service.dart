@@ -1,5 +1,4 @@
 import 'dart:developer' as developer;
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -8,31 +7,26 @@ enum UserRole {
   buyer,
   seller,
   rider,
+  admin,
   none;
 
   String get displayName {
     switch (this) {
-      case UserRole.buyer:
-        return 'Buyer';
-      case UserRole.seller:
-        return 'Seller';
-      case UserRole.rider:
-        return 'Rider';
-      case UserRole.none:
-        return 'None';
+      case UserRole.buyer:  return 'Buyer';
+      case UserRole.seller: return 'Seller';
+      case UserRole.rider:  return 'Rider';
+      case UserRole.admin:  return 'Admin';
+      case UserRole.none:   return 'None';
     }
   }
 
   String get route {
     switch (this) {
-      case UserRole.buyer:
-        return '/home';
-      case UserRole.seller:
-        return '/seller/dashboard';
-      case UserRole.rider:
-        return '/rider/dashboard';
-      case UserRole.none:
-        return '/onboarding';
+      case UserRole.buyer:  return '/home';
+      case UserRole.seller: return '/seller/dashboard';
+      case UserRole.rider:  return '/rider/dashboard';
+      case UserRole.admin:  return '/admin/dashboard';
+      case UserRole.none:   return '/onboarding';
     }
   }
 }
@@ -91,12 +85,10 @@ class UnifiedAuthService {
 
       // Convert string to enum
       switch (roleString.toLowerCase()) {
-        case 'buyer':
-          return UserRole.buyer;
-        case 'seller':
-          return UserRole.seller;
-        case 'rider':
-          return UserRole.rider;
+        case 'buyer':  return UserRole.buyer;
+        case 'seller': return UserRole.seller;
+        case 'rider':  return UserRole.rider;
+        case 'admin':  return UserRole.admin;
         default:
           developer.log('Unknown role: $roleString');
           return UserRole.none;
@@ -107,66 +99,12 @@ class UnifiedAuthService {
     }
   }
 
-  /// Get user's available roles (for users with multiple roles)
+  /// Get user's available roles by reading the role field from the users table.
+  /// Each account has exactly one role; this wraps getUserRole() for compatibility.
   static Future<List<UserRole>> getUserRoles() async {
-    try {
-      final session = _db.auth.currentSession;
-      if (session?.user == null) return [];
-
-      final userId = session!.user!.id;
-      final roles = <UserRole>[];
-
-      // Check if user has buyer role
-      try {
-        final buyerProfile = await _db
-            .from('users')
-            .select('role')
-            .eq('auth_user_id', userId)
-            .eq('role', 'buyer')
-            .maybeSingle();
-
-        if (buyerProfile != null) {
-          roles.add(UserRole.buyer);
-        }
-      } catch (e) {
-        // Ignore errors - role might not exist
-      }
-
-      // Check if user has seller role
-      try {
-        final sellerProfile = await _db
-            .from('sellers')
-            .select('user_id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (sellerProfile != null) {
-          roles.add(UserRole.seller);
-        }
-      } catch (e) {
-        // Ignore errors - table might not exist
-      }
-
-      // Check if user has rider role
-      try {
-        final riderProfile = await _db
-            .from('riders')
-            .select('user_id')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (riderProfile != null) {
-          roles.add(UserRole.rider);
-        }
-      } catch (e) {
-        // Ignore errors - table might not exist
-      }
-
-      return roles;
-    } catch (e) {
-      developer.log('Error getting user roles: $e');
-      return [];
-    }
+    final role = await getUserRole();
+    if (role == UserRole.none) return [];
+    return [role];
   }
 
   /// Get the last active role for users with multiple roles
@@ -194,29 +132,12 @@ class UnifiedAuthService {
     await prefs.setString(_lastActiveRoleKey, role.name);
   }
 
-  /// Determine the appropriate route for the current user
+  /// Determine the appropriate route for the current user based on their role.
   static Future<String> determineRoute() async {
-    final roles = await getUserRoles();
-
-    if (roles.isEmpty) {
-      return '/onboarding';
-    }
-
-    if (roles.length == 1) {
-      final role = roles.first;
-      await setLastActiveRole(role);
-      return role.route;
-    }
-
-    // Multiple roles - use last active role or default to buyer
-    final lastActive = await getLastActiveRole();
-    if (lastActive != null && roles.contains(lastActive)) {
-      return lastActive.route;
-    }
-
-    // Default to buyer if no last active role
-    await setLastActiveRole(UserRole.buyer);
-    return UserRole.buyer.route;
+    final role = await getUserRole();
+    if (role == UserRole.none) return '/onboarding';
+    await setLastActiveRole(role);
+    return role.route;
   }
 
   /// Logout from all roles

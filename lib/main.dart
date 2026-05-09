@@ -1,13 +1,17 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
 import 'screens/auth_loading_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'screens/pending_approval_screen.dart';
 import 'screens/shop_screen.dart';
+import 'screens/unauthorized_screen.dart';
 import 'screens/seller/seller_dashboard_screen.dart';
 import 'screens/rider/rider_dashboard_screen.dart';
 
@@ -83,9 +87,15 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Varón',
       theme: ThemeData(
-        fontFamily: 'Poppins',
+        textTheme: GoogleFonts.interTextTheme(),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF0A0A0A),
+          onPrimary: Colors.white,
+          surface: Colors.white,
+          onSurface: Color(0xFF0A0A0A),
+        ),
       ),
-      home: const LoginScreen(),
+      home: const LandingScreen(),
       routes: {
         '/auth-loading':      (context) => const AuthLoadingScreen(),
         '/login':             (context) => const LoginScreen(),
@@ -94,6 +104,11 @@ class MyApp extends StatelessWidget {
         '/shop':              (context) => const ShopScreen(),
         '/seller/dashboard':  (context) => const SellerDashboardScreen(),
         '/rider/dashboard':   (context) => const RiderDashboardScreen(),
+        '/unauthorized':      (context) => const UnauthorizedScreen(),
+        '/pending':           (context) => const PendingApprovalScreen(),
+        // Legacy aliases — redirect to unified login
+        '/seller/login':      (context) => const LoginScreen(),
+        '/rider/login':       (context) => const LoginScreen(),
       },
     );
   }

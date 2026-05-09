@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
 import '../../services/rider_auth_service.dart';
+import '../../services/unified_auth_service.dart';
 import 'rider_available_orders_screen.dart';
 import 'rider_delivery_detail_screen.dart';
 import 'rider_earnings_screen.dart';
@@ -32,8 +33,34 @@ class _RiderDashboardScreenState extends State<RiderDashboardScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final email = await RiderAuthService.getCurrentRiderEmail();
-    if (email == null || !mounted) return;
+
+    // Role guard: only rider accounts may access this dashboard
+    final role = await UnifiedAuthService.getUserRole();
+    if (role != UserRole.rider) {
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          role == UserRole.none ? '/login' : '/unauthorized',
+          arguments: 'You do not have rider access.',
+        );
+      }
+      return;
+    }
+
+    var email = await RiderAuthService.getCurrentRiderEmail();
+    if (email == null) {
+      // Session keys missing — try to re-sync
+      final status = await RiderAuthService.syncSession();
+      if (status == null) {
+        if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+        return;
+      }
+      email = await RiderAuthService.getCurrentRiderEmail();
+    }
+
+    if (email == null || !mounted) {
+      if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+      return;
+    }
 
     try {
       developer.log('[RIDER_DASHBOARD] Loading data for: $email');
@@ -79,7 +106,7 @@ class _RiderDashboardScreenState extends State<RiderDashboardScreen> {
   Future<void> _logout() async {
     await RiderAuthService.logout();
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/rider/login');
+      Navigator.of(context).pushReplacementNamed('/login');
     }
   }
 

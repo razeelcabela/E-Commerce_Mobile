@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
@@ -232,21 +233,21 @@ class _LoginScreenState extends State<LoginScreen>
                 width: 420,
                 child: Column(
               children: [
-                const Text(
+                Text(
                   'VARÓN',
-                  style: TextStyle(
+                  style: GoogleFonts.commissioner(
                     fontSize: 22,
                     fontWeight: FontWeight.w300,
-                    color: Color(0xFF0A0A0A),
+                    color: const Color(0xFF0A0A0A),
                     letterSpacing: 8,
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'PREMIUM MINIMALIST FASHION',
-                  style: TextStyle(
+                  style: GoogleFonts.commissioner(
                     fontSize: 8,
-                    color: Color(0xFF999999),
+                    color: const Color(0xFF999999),
                     letterSpacing: 4,
                   ),
                 ),
@@ -287,7 +288,7 @@ class _LoginScreenState extends State<LoginScreen>
                             loading
                                 ? 'PLEASE WAIT...'
                                 : (isLogin ? 'SIGN IN' : 'CREATE ACCOUNT'),
-                            style: const TextStyle(
+                            style: GoogleFonts.commissioner(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               letterSpacing: 2.5,
@@ -317,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.commissioner(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 2,
@@ -482,10 +483,10 @@ class _LoginScreenState extends State<LoginScreen>
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(
+          style: GoogleFonts.commissioner(
             fontSize: 9,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF888888),
+            color: const Color(0xFF888888),
             letterSpacing: 1.5,
           ),
         ),
@@ -493,9 +494,9 @@ class _LoginScreenState extends State<LoginScreen>
         TextField(
           controller: ctrl,
           obscureText: obscure,
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 14,
-            color: Color(0xFF0A0A0A),
+            color: const Color(0xFF0A0A0A),
           ),
           decoration: InputDecoration(
             isDense: true,

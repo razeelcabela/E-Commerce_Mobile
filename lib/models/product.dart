@@ -1,5 +1,5 @@
 class Product {
-  final int id;
+  final dynamic id; // Support both int and String (UUID)
   final String name;
   final double price;
   final String description;
@@ -15,8 +15,20 @@ class Product {
     required this.imageUrl,
   });
 
+  // Factory constructor to create from Supabase JSON
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: json['id'],
+      name: json['name'] ?? '',
+      price: (json['price'] is int) ? (json['price'] as int).toDouble() : (json['price'] as double?) ?? 0.0,
+      description: json['description'] ?? '',
+      category: json['category'] ?? 'Uncategorized',
+      imageUrl: json['image_url'] ?? '',
+    );
+  }
+
   Product copyWith({
-    int? id,
+    dynamic id,
     String? name,
     double? price,
     String? description,

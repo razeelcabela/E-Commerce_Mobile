@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/product.dart';
 import '../services/auth_service.dart';
 import '../services/cart_service.dart';
+import '../services/product_service.dart';
 import 'product_detail_screen.dart';
 import 'cart_screen.dart';
 
@@ -16,9 +18,16 @@ class ShopScreen extends StatefulWidget {
 
 class _ShopScreenState extends State<ShopScreen> {
   late CartService cartService;
+  late ProductService productService;
   String selectedCategory = 'All';
+  
+  List<Product> allProducts = [];
+  List<String> availableCategories = [];
+  bool isLoading = true;
+  String? errorMessage;
 
-  final products = [
+  // Hardcoded fallback products (for development/testing)
+  final List<Product> fallbackProducts = [
     Product(
       id: 1,
       name: 'Classic White Shirt',
@@ -89,16 +98,51 @@ class _ShopScreenState extends State<ShopScreen> {
   void initState() {
     super.initState();
     cartService = CartService();
+    productService = ProductService();
     if (widget.category != null) {
       selectedCategory = widget.category!;
+    }
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final products = await ProductService.getAllProducts();
+      final categories = await ProductService.getCategories();
+      
+      if (mounted) {
+        setState(() {
+          if (products.isEmpty) {
+            // Use fallback if no products from Supabase
+            allProducts = fallbackProducts;
+            errorMessage = '⚠️ Loading from fallback data. Check Supabase connection.';
+            print('⚠️ No products from Supabase, using fallback data');
+          } else {
+            allProducts = products;
+            errorMessage = null;
+            print('✅ Loaded ${products.length} products from Supabase');
+          }
+          availableCategories = categories;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          allProducts = fallbackProducts;
+          errorMessage = '❌ Connection error: $e';
+          isLoading = false;
+          print('❌ Error loading products: $e');
+        });
+      }
     }
   }
 
   List<Product> getFilteredProducts() {
     if (selectedCategory == 'All') {
-      return products;
+      return allProducts;
     }
-    return products.where((p) => p.category == selectedCategory).toList();
+    return allProducts.where((p) => p.category == selectedCategory).toList();
   }
 
   Future<void> _logout() async {
@@ -150,10 +194,10 @@ class _ShopScreenState extends State<ShopScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'VARÓN',
-              style: TextStyle(
-                color: Color(0xFF0A0A0A),
+              style: GoogleFonts.commissioner(
+                color: const Color(0xFF0A0A0A),
                 fontSize: 16,
                 fontWeight: FontWeight.w300,
                 letterSpacing: 6,
@@ -162,8 +206,8 @@ class _ShopScreenState extends State<ShopScreen> {
             if (selectedCategory != 'All')
               Text(
                 selectedCategory.toUpperCase(),
-                style: const TextStyle(
-                  color: Color(0xFF888888),
+                style: GoogleFonts.commissioner(
+                  color: const Color(0xFF888888),
                   fontSize: 9,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 2.5,
@@ -222,100 +266,161 @@ class _ShopScreenState extends State<ShopScreen> {
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 8 : 40,
-              vertical: isMobile ? 12 : 32,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Category Filter
-                if (isMobile)
-                  Column(
+        child: isLoading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF0A0A0A),
+                    ),
+                    SizedBox(height: 16),
+                    Text('Loading products...'),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 8 : 40,
+                    vertical: isMobile ? 12 : 32,
+                  ),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Categories',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
+                      // Error Message (if any)
+                      if (errorMessage != null && errorMessage!.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3CD),
+                            border: Border.all(color: const Color(0xFFFFD580)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            errorMessage!,
+                            style: const TextStyle(
+                              color: Color(0xFF856404),
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
+                      // Category Filter
+                      if (isMobile)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            ..._buildCategoryButtons(),
+                            Text(
+                              'SHOP BY CATEGORY',
+                              style: GoogleFonts.commissioner(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0A0A0A),
+                                letterSpacing: 3,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  ..._buildCategoryButtons(),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
                           ],
+                        )
+                      else
+                        Row(
+                          children: _buildCategoryButtons(),
+                        ),
+
+                      SizedBox(height: isMobile ? 20 : 32),
+
+                      Text(
+                        (selectedCategory == 'All'
+                                ? 'All Products'
+                                : selectedCategory)
+                            .toUpperCase(),
+                        style: GoogleFonts.commissioner(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF0A0A0A),
+                          letterSpacing: 4,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 10),
+                      Container(width: 28, height: 1, color: const Color(0xFF0A0A0A)),
+                      const SizedBox(height: 10),
+                      if (allProducts.isEmpty)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 48),
+                            child: Text(
+                              'No products available',
+                              style: TextStyle(color: Color(0xFF999999)),
+                            ),
+                          ),
+                        )
+                      else
+                        Text(
+                          '${getFilteredProducts().length} items',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF999999),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      SizedBox(height: isMobile ? 20 : 32),
+
+                      _buildProductsGrid(isMobile),
                     ],
-                  )
-                else
-                  Row(
-                    children: _buildCategoryButtons(),
-                  ),
-
-                SizedBox(height: isMobile ? 20 : 32),
-
-                Text(
-                  (selectedCategory == 'All'
-                          ? 'All Products'
-                          : selectedCategory)
-                      .toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A0A0A),
-                    letterSpacing: 4,
                   ),
                 ),
-                const SizedBox(height: 10),
-                Container(width: 28, height: 1, color: const Color(0xFF0A0A0A)),
-                const SizedBox(height: 10),
-                Text(
-                  '${filteredProducts.length} items',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF999999),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(height: isMobile ? 20 : 32),
+              ),
+      ),
+    );
+  }
 
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final screenWidth = constraints.maxWidth;
-                    final crossAxisCount = isMobile ? 2 : 4;
-                    final itemWidth = (screenWidth - (isMobile ? 24 : 64)) / crossAxisCount;
-                    final itemHeight = isMobile ? itemWidth * 1.4 : itemWidth * 1.3;
-
-                    return GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: isMobile ? 8 : 16,
-                        mainAxisSpacing: isMobile ? 12 : 24,
-                        childAspectRatio: itemWidth / itemHeight,
-                      ),
-                      itemCount: filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        return _buildProductCard(filteredProducts[index], isMobile);
-                      },
-                    );
-                  },
-                ),
-              ],
-            ),
+  Widget _buildProductsGrid(bool isMobile) {
+    final filteredProducts = getFilteredProducts();
+    if (filteredProducts.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Text(
+            'No products in this category',
+            style: TextStyle(color: Color(0xFF999999)),
           ),
         ),
-      ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final crossAxisCount = isMobile ? 2 : 4;
+        final itemWidth = (screenWidth - (isMobile ? 24 : 64)) / crossAxisCount;
+        final itemHeight = isMobile ? itemWidth * 1.4 : itemWidth * 1.3;
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: isMobile ? 8 : 16,
+            mainAxisSpacing: isMobile ? 12 : 24,
+            childAspectRatio: itemWidth / itemHeight,
+          ),
+          itemCount: filteredProducts.length,
+          itemBuilder: (context, index) {
+            return _buildProductCard(filteredProducts[index], isMobile);
+          },
+        );
+      },
     );
   }
 
@@ -334,7 +439,7 @@ class _ShopScreenState extends State<ShopScreen> {
           backgroundColor: Colors.white,
           selectedColor: const Color(0xFF0A0A0A),
           showCheckmark: false,
-          labelStyle: TextStyle(
+          labelStyle: GoogleFonts.commissioner(
             color: isSelected ? Colors.white : const Color(0xFF0A0A0A),
             fontWeight: FontWeight.w600,
             fontSize: 9,
@@ -423,15 +528,16 @@ class _ShopScreenState extends State<ShopScreen> {
               ),
             ),
           ),
-          SizedBox(height: isMobile ? 6 : 10),
+          SizedBox(height: isMobile ? 8 : 10),
           SizedBox(
-            height: isMobile ? 24 : 32,
+            height: isMobile ? 28 : 34,
             child: Text(
               product.name,
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-                color: Colors.black,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF0A0A0A),
+                height: 1.35,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -440,20 +546,20 @@ class _ShopScreenState extends State<ShopScreen> {
           SizedBox(height: isMobile ? 2 : 4),
           Text(
             product.description,
-            style: TextStyle(
+            style: GoogleFonts.inter(
               fontSize: isMobile ? 9 : 11,
-              color: Colors.grey,
+              color: const Color(0xFF999999),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: isMobile ? 4 : 6),
+          SizedBox(height: isMobile ? 6 : 8),
           Text(
             '₱${product.price.toStringAsFixed(0)}',
-            style: TextStyle(
+            style: GoogleFonts.inter(
               fontSize: priceFontSize,
-              color: Colors.black,
-              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0A0A0A),
+              fontWeight: FontWeight.w600,
             ),
           ),
           SizedBox(height: isMobile ? 6 : 8),
@@ -472,7 +578,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   ),
                   child: Text(
                     'VIEW',
-                    style: TextStyle(
+                    style: GoogleFonts.commissioner(
                       fontSize: buttonFontSize,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF0A0A0A),
@@ -497,7 +603,7 @@ class _ShopScreenState extends State<ShopScreen> {
                   ),
                   child: Text(
                     'ADD',
-                    style: TextStyle(
+                    style: GoogleFonts.commissioner(
                       fontSize: buttonFontSize,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.5,

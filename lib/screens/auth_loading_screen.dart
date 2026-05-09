@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/rider_auth_service.dart';
+import '../services/seller_auth_service.dart';
 import '../services/unified_auth_service.dart';
 
 /// Premium loading screen for Varón authentication flow
@@ -53,43 +56,90 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
 
   Future<void> _determineUserRole() async {
     try {
-      // Small delay for smooth UX
       await Future.delayed(const Duration(milliseconds: 800));
-
       if (!mounted) return;
 
-      // Check if user is authenticated
       final isAuthenticated = await UnifiedAuthService.isAuthenticated();
-
       if (!mounted) return;
 
       if (!isAuthenticated) {
-        // Not authenticated - go to login
         Navigator.of(context).pushReplacementNamed('/login');
         return;
       }
 
-      // Get user roles
-      final roles = await UnifiedAuthService.getUserRoles();
-
+      // Single source of truth: read role from users.role column
+      final role = await UnifiedAuthService.getUserRole();
       if (!mounted) return;
 
-      if (roles.isEmpty) {
-        // No roles found - needs onboarding
+      if (role == UserRole.none) {
         Navigator.of(context).pushReplacementNamed('/onboarding');
         return;
       }
 
-      // Determine route based on roles
-      final route = await UnifiedAuthService.determineRoute();
+      // Sync role-specific session keys and check approval status
+      if (role == UserRole.seller) {
+        final status = await SellerAuthService.syncSession();
+        if (!mounted) return;
+        if (status == null) {
+          // Seller profile missing — treat as unauthorized
+          Navigator.of(context).pushReplacementNamed(
+            '/unauthorized',
+            arguments: 'No seller profile found for this account.',
+          );
+          return;
+        }
+        if (status == 'pending') {
+          Navigator.of(context).pushReplacementNamed(
+            '/pending',
+            arguments: 'seller',
+          );
+          return;
+        }
+        if (status == 'suspended') {
+          Navigator.of(context).pushReplacementNamed(
+            '/unauthorized',
+            arguments: 'Your seller account has been suspended.',
+          );
+          return;
+        }
+      } else if (role == UserRole.rider) {
+        final status = await RiderAuthService.syncSession();
+        if (!mounted) return;
+        if (status == null) {
+          Navigator.of(context).pushReplacementNamed(
+            '/unauthorized',
+            arguments: 'No rider profile found for this account.',
+          );
+          return;
+        }
+        if (status == 'pending') {
+          Navigator.of(context).pushReplacementNamed(
+            '/pending',
+            arguments: 'rider',
+          );
+          return;
+        }
+        if (status == 'suspended') {
+          Navigator.of(context).pushReplacementNamed(
+            '/unauthorized',
+            arguments: 'Your rider account has been suspended.',
+          );
+          return;
+        }
+      }
 
-      if (!mounted) return;
+      // Persist role in SharedPreferences for fast dashboard guard checks
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        await UnifiedAuthService.saveSession(
+          role,
+          session.user.email ?? '',
+          session.user.id,
+        );
+      }
 
-      // Navigate to appropriate dashboard
-      Navigator.of(context).pushReplacementNamed(route);
-
+      Navigator.of(context).pushReplacementNamed(role.route);
     } catch (e) {
-      // On error, go to login
       if (mounted) {
         Navigator.of(context).pushReplacementNamed('/login');
       }

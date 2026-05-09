@@ -3,6 +3,7 @@ import '../../models/order.dart';
 import '../../services/order_service.dart';
 import '../../services/seller_auth_service.dart';
 import '../../services/seller_product_service.dart';
+import '../../services/unified_auth_service.dart';
 import 'seller_orders_screen.dart';
 import 'seller_products_screen.dart';
 
@@ -29,20 +30,42 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _load() async {
-    final email = await SellerAuthService.getCurrentSellerEmail();
-    if (email == null) {
-      if (mounted) Navigator.of(context).pushReplacementNamed('/seller/login');
+    // Role guard: only seller accounts may access this dashboard
+    final role = await UnifiedAuthService.getUserRole();
+    if (role != UserRole.seller) {
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          role == UserRole.none ? '/login' : '/unauthorized',
+          arguments: 'You do not have seller access.',
+        );
+      }
       return;
     }
-    final storeName = await SellerAuthService.getStoreName(email);
-    final products = await SellerProductService.getByEmail(email);
-    final statusCounts = await OrderService.sellerStatusCounts(email);
-    final revenue = await OrderService.sellerRevenue(email);
-    final orders = await OrderService.getBySeller(email);
+
+    final email = await SellerAuthService.getCurrentSellerEmail();
+    if (email == null) {
+      // Session keys missing — try to re-sync then retry
+      final status = await SellerAuthService.syncSession();
+      if (status == null) {
+        if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+        return;
+      }
+    }
+
+    final resolvedEmail = email ?? await SellerAuthService.getCurrentSellerEmail();
+    if (resolvedEmail == null) {
+      if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+      return;
+    }
+    final storeName = await SellerAuthService.getStoreName(resolvedEmail);
+    final products = await SellerProductService.getByEmail(resolvedEmail);
+    final statusCounts = await OrderService.sellerStatusCounts(resolvedEmail);
+    final revenue = await OrderService.sellerRevenue(resolvedEmail);
+    final orders = await OrderService.getBySeller(resolvedEmail);
 
     if (!mounted) return;
     setState(() {
-      _email = email;
+      _email = resolvedEmail;
       _storeName = storeName;
       _productCount = products.length;
       _statusCounts = statusCounts;
@@ -54,7 +77,7 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
 
   Future<void> _logout() async {
     await SellerAuthService.logout();
-    if (mounted) Navigator.of(context).pushReplacementNamed('/seller/login');
+    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
   }
 
   @override

@@ -36,6 +36,9 @@ class RiderAuthService {
     await prefs.remove(_currentRiderKey);
     await prefs.remove(_currentRiderIdKey);
     await prefs.remove(_currentRiderUserIdKey);
+    try {
+      await _db.auth.signOut();
+    } catch (_) {}
   }
 
   // ─── Register ──────────────────────────────────────────────────────────────
@@ -209,6 +212,44 @@ class RiderAuthService {
     } catch (e, stackTrace) {
       developer.log('Unexpected login error: $e\n$stackTrace');
       return 'Login failed: An unexpected error occurred.';
+    }
+  }
+
+  /// Syncs rider session keys from the current Supabase auth session.
+  /// Call this after unified login to populate SharedPreferences for the rider dashboards.
+  /// Returns rider status ('approved', 'pending', 'suspended') or null on failure.
+  static Future<String?> syncSession() async {
+    try {
+      final session = _db.auth.currentSession;
+      if (session == null) return null;
+
+      final email = session.user.email;
+      if (email == null) return null;
+
+      final user = await _db
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
+      if (user == null) return null;
+
+      final rider = await _db
+          .from('riders')
+          .select('id, status')
+          .eq('user_id', user['id'] as int)
+          .maybeSingle();
+      if (rider == null) return null;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_currentRiderKey, email);
+      await prefs.setInt(_currentRiderIdKey, rider['id'] as int);
+      await prefs.setInt(_currentRiderUserIdKey, user['id'] as int);
+
+      developer.log('Rider session synced for: $email (status: ${rider['status']})');
+      return rider['status'] as String? ?? 'pending';
+    } catch (e) {
+      developer.log('Error syncing rider session: $e');
+      return null;
     }
   }
 

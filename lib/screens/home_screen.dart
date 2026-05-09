@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/order.dart';
 import '../services/auth_service.dart';
 import '../services/order_service.dart';
@@ -303,21 +304,22 @@ class _HomeScreenState extends State<HomeScreen>
               Text(
                 'Elevate Your Style\nwith Varón',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.playfairDisplay(
                   fontSize: isMobile ? 36 : 64,
-                  fontWeight: FontWeight.w200,
+                  fontWeight: FontWeight.w400,
                   color: const Color(0xFF0A0A0A),
-                  height: 1.1,
+                  height: 1.15,
                   letterSpacing: -0.5,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'PREMIUM MINIMALIST FASHION',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.commissioner(
                   fontSize: 10,
-                  color: Color(0xFF888888),
+                  color: const Color(0xFF888888),
                   letterSpacing: 5,
                   fontWeight: FontWeight.w400,
                 ),
@@ -342,10 +344,10 @@ class _HomeScreenState extends State<HomeScreen>
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: GoogleFonts.commissioner(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF0A0A0A),
+            color: const Color(0xFF0A0A0A),
             letterSpacing: 4,
           ),
         ),
@@ -533,7 +535,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _socialIcons() {
-    return Row(
+    return const Row(
       children: [
         _FooterIcon(icon: Icons.facebook),
         _FooterIcon(icon: Icons.photo_camera_outlined),
@@ -769,7 +771,7 @@ class _CategoryCardState extends State<_CategoryCard> {
                     height: imgH,
                     width: double.infinity,
                     color: _hovered
-                        ? const Color(0xFF0A0A0A).withValues(alpha: 0.18)
+                        ? const Color(0xFF0A0A0A).withOpacity(0.18)
                         : Colors.transparent,
                   ),
                 ],
@@ -896,7 +898,7 @@ class _ProductCardState extends State<_ProductCard> {
                     height: imgH,
                     width: double.infinity,
                     color: _hovered
-                        ? const Color(0xFF0A0A0A).withValues(alpha: 0.06)
+                        ? const Color(0xFF0A0A0A).withOpacity(0.06)
                         : Colors.transparent,
                   ),
                 ],

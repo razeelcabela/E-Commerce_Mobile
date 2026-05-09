@@ -37,6 +37,9 @@ class SellerAuthService {
     await prefs.remove(_currentSellerKey);
     await prefs.remove(_currentSellerIdKey);
     await prefs.remove(_currentSellerUserIdKey);
+    try {
+      await _db.auth.signOut();
+    } catch (_) {}
   }
 
   // ─── Register ──────────────────────────────────────────────────────────────
@@ -225,6 +228,44 @@ class SellerAuthService {
   }
 
   // ─── Profile ───────────────────────────────────────────────────────────────
+
+  /// Syncs seller session keys from the current Supabase auth session.
+  /// Call this after unified login to populate SharedPreferences for the seller dashboards.
+  /// Returns seller status ('approved', 'pending', 'suspended') or null on failure.
+  static Future<String?> syncSession() async {
+    try {
+      final session = _db.auth.currentSession;
+      if (session == null) return null;
+
+      final email = session.user.email;
+      if (email == null) return null;
+
+      final user = await _db
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
+      if (user == null) return null;
+
+      final seller = await _db
+          .from('sellers')
+          .select('id, status')
+          .eq('user_id', user['id'] as int)
+          .maybeSingle();
+      if (seller == null) return null;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_currentSellerKey, email);
+      await prefs.setInt(_currentSellerIdKey, seller['id'] as int);
+      await prefs.setInt(_currentSellerUserIdKey, user['id'] as int);
+
+      developer.log('Seller session synced for: $email (status: ${seller['status']})');
+      return seller['status'] as String? ?? 'pending';
+    } catch (e) {
+      developer.log('Error syncing seller session: $e');
+      return null;
+    }
+  }
 
   static Future<String?> getStoreName(String email) async {
     final profile = await getProfile(email);

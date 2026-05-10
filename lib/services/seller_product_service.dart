@@ -14,22 +14,24 @@ class SellerProductService {
   static Map<int, String>? _categoryCache;
 
   static Future<Map<int, String>> _categoryMap() async {
-    if (_categoryCache != null) return _categoryCache!;
+    if (_categoryCache != null && _categoryCache!.isNotEmpty) return _categoryCache!;
     try {
       final rows = await _client
           .from('categories')
           .select('id, name')
-          .eq('is_active', 1)
           .order('name');
-      _categoryCache = {
-        for (final r in (rows as List))
-          (r['id'] as int): (r['name'] as String),
+      final list = rows as List;
+      debugPrint('✅ Categories fetched: ${list.length} rows → $list');
+      final map = {
+        for (final r in list)
+          (r['id'] as num).toInt(): (r['name'] as String),
       };
-    } catch (e) {
-      debugPrint('❌ Seller category map error: $e');
-      _categoryCache = {};
+      if (map.isNotEmpty) _categoryCache = map;
+      return map;
+    } catch (e, st) {
+      debugPrint('❌ Seller category map error: $e\n$st');
+      return {};
     }
-    return _categoryCache!;
   }
 
   /// Returns [{id, name}] list for category picker UI.
@@ -137,7 +139,7 @@ class SellerProductService {
         'stock': product.stock,
         'category_id': product.categoryId,
         'approval_status': 'pending',
-        'is_active': true,
+        'is_active': 1,
         'archive_status': 'active',
         'visibility': 'public',
         'delivery_options': product.deliveryOptions,
@@ -228,7 +230,7 @@ class SellerProductService {
       
       final imgMap = await _imageMap([productId]);
       return SellerProduct.fromSupabase(
-        _enrich(row as Map<String, dynamic>, catMap, imgMap),
+        _enrich(row, catMap, imgMap),
       );
     } catch (e) {
       debugPrint('❌ Error fetching product by ID: $e');
@@ -272,7 +274,7 @@ class SellerProductService {
           .from('products')
           .select()
           .eq('seller_id', sellerId)
-          .eq('is_active', true)
+          .eq('is_active', 1)
           .lt('stock', threshold)
           .order('stock', ascending: true);
 

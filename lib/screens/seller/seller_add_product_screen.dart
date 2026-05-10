@@ -34,6 +34,7 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
 
   // Category state (loaded from DB)
   List<Map<String, dynamic>> _categories = [];
+  bool _categoriesLoaded = false;
   int? _selectedCategoryId;
   String _selectedCategoryName = '';
 
@@ -71,12 +72,14 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
   }
 
   Future<void> _loadCategories() async {
+    setState(() => _categoriesLoaded = false);
     final cats = await SellerProductService.getCategories();
     if (!mounted) return;
     setState(() {
       _categories = cats;
+      _categoriesLoaded = true;
       if (_selectedCategoryId == null && cats.isNotEmpty) {
-        _selectedCategoryId = cats.first['id'] as int;
+        _selectedCategoryId = (cats.first['id'] as num).toInt();
         _selectedCategoryName = cats.first['name'] as String;
       }
     });
@@ -112,6 +115,10 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
     }
     if (stock == null || stock < 0) {
       _snack('Enter a valid stock quantity');
+      return;
+    }
+    if (_selectedCategoryId == null) {
+      _snack('Please select a category');
       return;
     }
 
@@ -438,48 +445,89 @@ class _SellerAddProductScreenState extends State<SellerAddProductScreen> {
           ),
         ),
         const SizedBox(height: 10),
-        _categories.isEmpty
-            ? Text('Loading...',
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: const Color(0xFFAAAAAA)))
-            : Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _categories.map((cat) {
-                  final id = cat['id'] as int;
-                  final name = cat['name'] as String;
-                  final selected = _selectedCategoryId == id;
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedCategoryId = id;
-                      _selectedCategoryName = name;
-                    }),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? const Color(0xFF0A0A0A)
-                            : const Color(0xFFF5F4F2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        name,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: selected
-                              ? Colors.white
-                              : const Color(0xFF555555),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+        if (!_categoriesLoaded)
+          Container(
+            height: 56,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F6F4),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 1.5, color: Color(0xFF0A0A0A)),
               ),
+            ),
+          )
+        else if (_categories.isEmpty)
+          Row(
+            children: [
+              Text('Failed to load categories',
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: const Color(0xFFAAAAAA))),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _loadCategories,
+                child: Text('Retry',
+                    style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: const Color(0xFF0A0A0A),
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline)),
+              ),
+            ],
+          )
+        else
+          DropdownButtonFormField<int>(
+            value: _selectedCategoryId,
+            isExpanded: true,
+            style: GoogleFonts.inter(
+                fontSize: 15, color: const Color(0xFF0A0A0A)),
+            dropdownColor: Colors.white,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFFF7F6F4),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: Color(0xFF0A0A0A), width: 1.5),
+              ),
+            ),
+            hint: Text('Select a category',
+                style: GoogleFonts.inter(
+                    fontSize: 14, color: const Color(0xFF999999))),
+            items: _categories.map((cat) {
+              final id = (cat['id'] as num).toInt();
+              final name = cat['name'] as String;
+              return DropdownMenuItem<int>(
+                value: id,
+                child: Text(name,
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: const Color(0xFF0A0A0A))),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val == null) return;
+              final cat = _categories.firstWhere(
+                  (c) => (c['id'] as num).toInt() == val);
+              setState(() {
+                _selectedCategoryId = val;
+                _selectedCategoryName = cat['name'] as String;
+              });
+            },
+          ),
       ],
     );
   }

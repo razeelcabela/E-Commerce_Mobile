@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/order.dart';
 import '../../services/order_service.dart';
+import 'rider_map_screen.dart';
 
 class RiderDeliveryDetailScreen extends StatefulWidget {
   final Order order;
@@ -127,7 +128,9 @@ class _RiderDeliveryDetailScreenState
             _timelineCard(),
             const SizedBox(height: 14),
             _addressCard(),
-            const SizedBox(height: 24),
+            const SizedBox(height: 14),
+            _viewOnMapButton(),
+            const SizedBox(height: 14),
             if (_order.status != Order.delivered) _actionButton(),
             if (_order.status == Order.delivered) _completedBanner(),
           ],
@@ -366,6 +369,36 @@ class _RiderDeliveryDetailScreenState
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // ── View on map button ─────────────────────────────────────────────────────
+
+  Widget _viewOnMapButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => RiderMapScreen(order: _order)));
+        },
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF0A0A0A),
+          side: const BorderSide(color: Color(0xFFDDDDDD), width: 1.5),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        icon: const Icon(Icons.map_outlined, size: 18),
+        label: Text(
+          'VIEW ON MAP',
+          style: GoogleFonts.commissioner(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2,
+          ),
+        ),
       ),
     );
   }

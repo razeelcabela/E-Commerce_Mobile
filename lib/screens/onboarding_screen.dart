@@ -68,9 +68,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 child: Column(
                   children: [
                     // Brand
-                    Column(
+                    const Column(
                       children: [
-                        const Text(
+                        Text(
                           'VARÓN',
                           style: TextStyle(
                             fontSize: 24,
@@ -79,8 +79,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             letterSpacing: 8,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        const Text(
+                        SizedBox(height: 8),
+                        Text(
                           'PREMIUM MINIMALIST FASHION',
                           style: TextStyle(
                             fontSize: 8,

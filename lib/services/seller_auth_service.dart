@@ -116,7 +116,7 @@ class SellerAuthService {
           'address': address.trim(),
           'contact_email': email.trim(),
           'contact_phone': phoneNumber.trim(),
-          'status': 'approved',
+          'status': 'pending',
           'commission_rate': 10.00,
           'island_group': 'Luzon',
         }).select('id').single();
@@ -320,6 +320,83 @@ class SellerAuthService {
     } catch (e) {
       developer.log('SellerAuth syncSession error: $e');
       return null;
+    }
+  }
+
+  // ─── Apply from existing buyer account ────────────────────────────────────
+
+  /// Upgrades the currently logged-in buyer account to seller role.
+  /// Updates users.role to 'seller' and creates a sellers row (status='pending').
+  /// Returns null on success, or an error message string on failure.
+  static Future<String?> applyAsSeller({
+    required String storeName,
+    required String fullName,
+    required String address,
+    required String phoneNumber,
+  }) async {
+    try {
+      final session = _db.auth.currentSession;
+      if (session == null) return 'You must be logged in to apply as a seller.';
+
+      final authUid = session.user.id;
+
+      final userRow = await _db
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', authUid)
+          .maybeSingle();
+
+      if (userRow == null) return 'User profile not found.';
+      final userId = userRow['id'] as int;
+
+      final existing = await _db
+          .from('sellers')
+          .select('id, status')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        final s = existing['status'] as String;
+        if (s == 'pending') return 'Your seller application is already pending review.';
+        if (s == 'approved') return 'You already have an active seller account.';
+        if (s == 'suspended') return 'Your seller account has been suspended.';
+      }
+
+      final parts = fullName.trim().split(' ');
+      final slug = storeName
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+
+      await _db.from('users').update({
+        'role': 'seller',
+        'first_name': parts.first,
+        'last_name': parts.length > 1 ? parts.sublist(1).join(' ') : '',
+        'phone': phoneNumber.trim(),
+      }).eq('id', userId);
+
+      await _db.from('sellers').insert({
+        'user_id': userId,
+        'auth_user_id': authUid,
+        'store_name': storeName.trim(),
+        'store_slug': '$slug-${DateTime.now().millisecondsSinceEpoch}',
+        'address': address.trim(),
+        'contact_email': session.user.email ?? '',
+        'contact_phone': phoneNumber.trim(),
+        'status': 'pending',
+        'commission_rate': 10.00,
+        'island_group': 'Luzon',
+      });
+
+      developer.log('Seller application submitted for: ${session.user.email}');
+      return null;
+    } on PostgrestException catch (e) {
+      developer.log('Seller application error: ${e.message}');
+      return 'Application failed: ${e.message}';
+    } catch (e) {
+      developer.log('Unexpected seller application error: $e');
+      return 'Application failed. Please try again.';
     }
   }
 

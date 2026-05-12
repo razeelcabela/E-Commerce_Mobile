@@ -74,14 +74,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       addr['province'], addr['region'],
     ].where((s) => s != null && s.isNotEmpty).join(', ');
 
-    final buyerEmail =
-        await AuthService.getUserEmail() ?? 'guest@varon.com';
+    final buyerEmail = await AuthService.getUserEmail();
+    if (buyerEmail == null) return;
+
     final items = cartService.getCartItems();
 
     for (final item in items) {
       final sellerProduct =
           await SellerProductService.getById('${item.product.id}');
-      final sellerEmail = sellerProduct?.sellerEmail ?? 'store@varon.com';
+      final sellerEmail = sellerProduct?.sellerEmail;
+      if (sellerEmail == null || sellerEmail.isEmpty) continue;
 
       await OrderService.place(Order(
         id: '${DateTime.now().millisecondsSinceEpoch}_${item.product.id}',
@@ -147,21 +149,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(height: 8),
               ...cartItems.map(
                 (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          '${item.product.name} ×${item.quantity}',
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF333333)),
+                      Text(
+                        item.product.name,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF0A0A0A),
                         ),
                       ),
-                      Text(
-                        '₱${item.getTotal().toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            fontSize: 13, color: Color(0xFF0A0A0A)),
+                      if (item.selectedSize != null ||
+                          item.selectedColor != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (item.selectedSize != null) item.selectedSize!,
+                            if (item.selectedColor != null) item.selectedColor!,
+                          ].join(' · '),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF888888),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '₱${item.product.price.toStringAsFixed(0)} × ${item.quantity}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF888888),
+                            ),
+                          ),
+                          Text(
+                            '₱${item.getTotal().toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0A0A0A),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -319,27 +352,55 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         children: [
                           ...cartItems.map(
                             (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(
-                                    child: Text(
-                                      '${item.product.name} ×${item.quantity}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF333333),
-                                      ),
-                                    ),
-                                  ),
                                   Text(
-                                    '₱${item.getTotal().toStringAsFixed(0)}',
+                                    item.product.name,
                                     style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                       color: Color(0xFF0A0A0A),
                                     ),
+                                  ),
+                                  if (item.selectedSize != null ||
+                                      item.selectedColor != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      [
+                                        if (item.selectedSize != null)
+                                          item.selectedSize!,
+                                        if (item.selectedColor != null)
+                                          item.selectedColor!,
+                                      ].join(' · '),
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF888888),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        '₱${item.product.price.toStringAsFixed(0)} × ${item.quantity}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFF888888),
+                                        ),
+                                      ),
+                                      Text(
+                                        '₱${item.getTotal().toStringAsFixed(0)}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF0A0A0A),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

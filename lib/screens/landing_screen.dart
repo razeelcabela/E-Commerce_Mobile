@@ -10,11 +10,24 @@ class LandingScreen extends StatefulWidget {
 
 class _LandingScreenState extends State<LandingScreen> {
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _categoriesKey = GlobalKey();
+  final GlobalKey _aboutKey = GlobalKey();
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToSection(GlobalKey key) {
+    final context = key.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
@@ -63,7 +76,7 @@ class _LandingScreenState extends State<LandingScreen> {
           Row(
             children: [
               TextButton(
-                onPressed: () {},
+                onPressed: () => _scrollToSection(_categoriesKey),
                 child: Text(
                   'Browse',
                   style: GoogleFonts.inter(
@@ -74,7 +87,7 @@ class _LandingScreenState extends State<LandingScreen> {
               ),
               const SizedBox(width: 16),
               TextButton(
-                onPressed: () {},
+                onPressed: () => _scrollToSection(_aboutKey),
                 child: Text(
                   'About',
                   style: GoogleFonts.inter(
@@ -267,6 +280,7 @@ class _LandingScreenState extends State<LandingScreen> {
     ];
 
     return Container(
+      key: _categoriesKey,
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Column(
@@ -344,6 +358,7 @@ class _LandingScreenState extends State<LandingScreen> {
 
   Widget _buildAboutSection() {
     return Container(
+      key: _aboutKey,
       color: const Color(0xFFFAFAFA),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
       child: Column(
@@ -431,8 +446,8 @@ class _LandingScreenState extends State<LandingScreen> {
         Container(
           width: 32,
           height: 32,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A0A0A),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0A0A0A),
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -598,8 +613,8 @@ class _LandingScreenState extends State<LandingScreen> {
             ],
           ),
           const SizedBox(height: 40),
-          Divider(
-            color: const Color(0xFF333333),
+          const Divider(
+            color: Color(0xFF333333),
             height: 32,
           ),
           Row(

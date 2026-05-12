@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/supabase_config.dart';
 import 'screens/auth_loading_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/buyer_main_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -102,7 +102,7 @@ class MyApp extends StatelessWidget {
         '/auth-loading':      (context) => const AuthLoadingScreen(),
         '/login':             (context) => const LoginScreen(),
         '/onboarding':        (context) => const OnboardingScreen(),
-        '/home':              (context) => const HomeScreen(),
+        '/home':              (context) => const BuyerMainScreen(),
         '/shop':              (context) => const ShopScreen(),
         '/admin/dashboard':   (context) => const AdminDashboardScreen(),
         '/seller/dashboard':       (context) => const SellerDashboardScreen(),

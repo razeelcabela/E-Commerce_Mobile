@@ -15,45 +15,41 @@ class CartService {
     return _cartItems;
   }
 
-  // Add product to cart (increase quantity if exists)
-  void addToCart(Product product) {
-    final existingItem = _cartItems.firstWhere(
-      (item) => item.product.id == product.id,
-      orElse: () => CartItem(product: product),
+  // Add product to cart, deduplicating by product+variant combination
+  void addToCart(Product product,
+      {String? selectedSize, String? selectedColor}) {
+    final newItem = CartItem(
+      product: product,
+      selectedSize: selectedSize,
+      selectedColor: selectedColor,
     );
-
-    if (_cartItems.contains(existingItem)) {
-      existingItem.quantity++;
+    final idx =
+        _cartItems.indexWhere((item) => item.variantKey == newItem.variantKey);
+    if (idx >= 0) {
+      _cartItems[idx].quantity++;
     } else {
-      _cartItems.add(existingItem);
+      _cartItems.add(newItem);
     }
   }
 
-  // Remove product from cart
-  void removeFromCart(int productId) {
+  // Remove by product ID (removes first match — use removeByVariantKey for precision)
+  void removeFromCart(dynamic productId) {
     _cartItems.removeWhere((item) => item.product.id == productId);
   }
 
-  // Update quantity
-  void updateQuantity(int productId, int quantity) {
-    final item = _cartItems.firstWhere(
-      (item) => item.product.id == productId,
-      orElse: () => CartItem(product: Product(
-        id: -1,
-        name: '',
-        price: 0,
-        description: '',
-        category: '',
-        imageUrl: '',
-      )),
-    );
+  // Remove the exact variant entry
+  void removeByVariantKey(String key) {
+    _cartItems.removeWhere((item) => item.variantKey == key);
+  }
 
-    if (item.product.id != -1) {
-      if (quantity <= 0) {
-        removeFromCart(productId);
-      } else {
-        item.quantity = quantity;
-      }
+  // Update quantity by variant key
+  void updateQuantityByVariant(String key, int quantity) {
+    final idx = _cartItems.indexWhere((item) => item.variantKey == key);
+    if (idx < 0) return;
+    if (quantity <= 0) {
+      _cartItems.removeAt(idx);
+    } else {
+      _cartItems[idx].quantity = quantity;
     }
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/rider_application_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/rider_auth_service.dart';
 
 class RiderApplicationFormScreen extends StatefulWidget {
@@ -16,35 +15,16 @@ class _RiderApplicationFormScreenState
   final _formKey = GlobalKey<FormState>();
 
   final _fullNameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _confirmPassCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _licenseCtrl = TextEditingController();
 
-  bool _obscurePass = true;
-  bool _obscureConfirm = true;
   bool _submitting = false;
   bool _submitted = false;
 
   @override
-  void initState() {
-    super.initState();
-    _prefillEmail();
-  }
-
-  Future<void> _prefillEmail() async {
-    final email = await AuthService.getUserEmail();
-    if (email != null && mounted) _emailCtrl.text = email;
-  }
-
-  @override
   void dispose() {
     _fullNameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    _confirmPassCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
     _licenseCtrl.dispose();
@@ -56,11 +36,7 @@ class _RiderApplicationFormScreenState
 
     setState(() => _submitting = true);
 
-    final buyerEmail = await AuthService.getUserEmail();
-
-    final error = await RiderAuthService.register(
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text,
+    final error = await RiderAuthService.applyAsRider(
       fullName: _fullNameCtrl.text.trim(),
       phoneNumber: _phoneCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
@@ -84,16 +60,40 @@ class _RiderApplicationFormScreenState
       return;
     }
 
-    if (buyerEmail != null) {
-      await RiderApplicationService.syncRole(
-          buyerEmail, RiderApplicationService.roleRider);
-    }
-
-    if (!mounted) return;
     setState(() {
       _submitting = false;
       _submitted = true;
     });
+  }
+
+  Future<void> _logoutAndGoToLogin() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+    }
   }
 
   @override
@@ -143,7 +143,7 @@ class _RiderApplicationFormScreenState
             ),
             const SizedBox(height: 28),
             const Text(
-              'RIDER ACCOUNT CREATED',
+              'APPLICATION SUBMITTED',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -154,8 +154,8 @@ class _RiderApplicationFormScreenState
             ),
             const SizedBox(height: 16),
             const Text(
-              'Your rider account is now active. Sign in to the Rider Portal '
-              'to start accepting and delivering orders.',
+              'Your rider application is pending admin review. '
+              'Log in again to check your application status.',
               style: TextStyle(
                   fontSize: 13, color: Color(0xFF666666), height: 1.7),
               textAlign: TextAlign.center,
@@ -165,7 +165,7 @@ class _RiderApplicationFormScreenState
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: _logoutAndGoToLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0A0A0A),
                   elevation: 0,
@@ -173,7 +173,7 @@ class _RiderApplicationFormScreenState
                       borderRadius: BorderRadius.zero),
                 ),
                 child: const Text(
-                  'GO TO PROFILE',
+                  'LOG IN',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -198,8 +198,8 @@ class _RiderApplicationFormScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Register as a delivery rider on Varón and earn commission '
-              'on every successful delivery.',
+              'Apply to become a delivery rider on Varón. Your application '
+              'will be reviewed by our team before activation.',
               style: TextStyle(
                   fontSize: 13, color: Color(0xFF666666), height: 1.7),
             ),
@@ -243,7 +243,7 @@ class _RiderApplicationFormScreenState
 
             const SizedBox(height: 32),
 
-            // ── Driver's License (REQUIRED) ───────────────────────────────
+            // ── Driver's License ──────────────────────────────────────────
             _sectionLabel("DRIVER'S LICENSE"),
             const SizedBox(height: 4),
             Container(
@@ -285,56 +285,6 @@ class _RiderApplicationFormScreenState
               },
             ),
 
-            const SizedBox(height: 32),
-
-            // ── Rider Login Credentials ───────────────────────────────────
-            _sectionLabel('RIDER LOGIN CREDENTIALS'),
-            const SizedBox(height: 4),
-            const Text(
-              'Use these to sign in to the Rider Portal.',
-              style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'EMAIL ADDRESS',
-              controller: _emailCtrl,
-              hint: 'rider@example.com',
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!v.contains('@')) return 'Enter a valid email';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'PASSWORD',
-              controller: _passwordCtrl,
-              hint: 'Min. 6 characters',
-              obscure: _obscurePass,
-              onToggleObscure: () =>
-                  setState(() => _obscurePass = !_obscurePass),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Password is required';
-                if (v.length < 6) {
-                  return 'Password must be at least 6 characters';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'CONFIRM PASSWORD',
-              controller: _confirmPassCtrl,
-              hint: 'Re-enter password',
-              obscure: _obscureConfirm,
-              onToggleObscure: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-              validator: (v) => v != _passwordCtrl.text
-                  ? 'Passwords do not match'
-                  : null,
-            ),
-
             const SizedBox(height: 40),
             Container(height: 1, color: const Color(0xFFEEEEEE)),
             const SizedBox(height: 28),
@@ -359,7 +309,7 @@ class _RiderApplicationFormScreenState
                             color: Colors.white, strokeWidth: 2),
                       )
                     : const Text(
-                        'CREATE RIDER ACCOUNT',
+                        'SUBMIT APPLICATION',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -400,8 +350,6 @@ class _RiderApplicationFormScreenState
     String? hint,
     int maxLines = 1,
     TextInputType? keyboardType,
-    bool obscure = false,
-    VoidCallback? onToggleObscure,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -421,7 +369,6 @@ class _RiderApplicationFormScreenState
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
-          obscureText: obscure,
           validator: validator,
           style: const TextStyle(fontSize: 13, color: Color(0xFF0A0A0A)),
           decoration: InputDecoration(
@@ -430,23 +377,6 @@ class _RiderApplicationFormScreenState
                 const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC)),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            suffixIcon: onToggleObscure != null
-                ? GestureDetector(
-                    onTap: onToggleObscure,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 14),
-                      child: Icon(
-                        obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        size: 16,
-                        color: const Color(0xFF888888),
-                      ),
-                    ),
-                  )
-                : null,
-            suffixIconConstraints:
-                const BoxConstraints(minWidth: 44, minHeight: 44),
             enabledBorder: const OutlineInputBorder(
               borderRadius: BorderRadius.zero,
               borderSide: BorderSide(color: Color(0xFFDDDDDD)),

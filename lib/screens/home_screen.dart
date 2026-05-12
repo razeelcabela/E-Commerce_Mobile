@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/order.dart';
+import '../models/product.dart';
 import '../services/auth_service.dart';
+import '../services/cart_service.dart';
 import '../services/order_service.dart';
+import '../services/product_service.dart';
 import '../services/rider_application_service.dart';
 import '../services/seller_application_service.dart';
+import '../widgets/variant_picker_sheet.dart';
 import 'buyer_orders_screen.dart';
 import 'rider_application_form_screen.dart';
 import 'rider/rider_dashboard_screen.dart';
@@ -27,7 +31,35 @@ class _HomeScreenState extends State<HomeScreen>
   late final Animation<Offset> _heroSlide;
   late final Animation<double> _sectionFade;
 
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final CartService _cartService = CartService();
+
+  List<String> _categories = [];
+  List<Product> _featuredProducts = [];
+
+  // Maps lowercased category name → Unsplash image URL
+  static const Map<String, String> _catImages = {
+    'tops': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop',
+    'shirts': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop',
+    'casual shirts': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop',
+    'polo shirt': 'https://images.unsplash.com/photo-1586363104862-3a5e2ab60d99?w=400&h=400&fit=crop',
+    't-shirts': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop',
+    'bottoms': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop',
+    'pants': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop',
+    'shorts': 'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&h=400&fit=crop',
+    'activewear & fitness tops': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop',
+    'activewear & fitness bottoms': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop',
+    'outerwear & jackets': 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=400&fit=crop',
+    'footwear': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop',
+    'accessories': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop',
+    'grooming products': 'https://images.unsplash.com/photo-1512207736890-6ffed8a84e8d?w=400&h=400&fit=crop',
+    'barong': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=400&fit=crop',
+    'suits & blazers': 'https://images.unsplash.com/photo-1593030761757-71fae45fa0e7?w=400&h=400&fit=crop',
+  };
+  static const _defaultCatImage =
+      'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&h=400&fit=crop';
+
+  String _catImage(String name) =>
+      _catImages[name.toLowerCase()] ?? _defaultCatImage;
 
   @override
   void initState() {
@@ -52,6 +84,19 @@ class _HomeScreenState extends State<HomeScreen>
       curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
     );
     _ctrl.forward();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final results = await Future.wait([
+      ProductService.getCategories(),
+      ProductService.getFeatured(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _categories = results[0] as List<String>;
+      _featuredProducts = results[1] as List<Product>;
+    });
   }
 
   @override
@@ -61,11 +106,67 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _logout() async {
-    await AuthService.logout();
-    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      await AuthService.logout();
+      if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   void _shopNow() => Navigator.of(context).pushNamed('/shop');
+
+  void _showVariantPicker(Product p) {
+    VariantPickerSheet.show(
+      context,
+      product: p,
+      onAddToCart: (size, color, qty) {
+        for (int i = 0; i < qty; i++) {
+          _cartService.addToCart(p, selectedSize: size, selectedColor: color);
+        }
+        final parts = [if (size != null) size, if (color != null) color];
+        final suffix = parts.isNotEmpty ? ' (${parts.join(' · ')})' : '';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check, color: Colors.white, size: 14),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  '${p.name}$suffix  ×$qty added to cart',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, fontWeight: FontWeight.w400),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF0A0A0A),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          margin: const EdgeInsets.all(16),
+        ));
+      },
+    );
+  }
 
   void _navigateToScreen(String label, BuildContext context) {
     switch (label.toLowerCase()) {
@@ -75,16 +176,6 @@ class _HomeScreenState extends State<HomeScreen>
       case 'shop':
         Navigator.of(context).pushNamed('/shop');
         break;
-      case 'shirts':
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const ShopScreen(category: 'Shirts'),
-        ));
-        break;
-      case 'pants':
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const ShopScreen(category: 'Pants'),
-        ));
-        break;
       case 'cart':
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => const CartScreen(),
@@ -93,6 +184,11 @@ class _HomeScreenState extends State<HomeScreen>
       case 'profile':
         _showProfileSheet(context);
         break;
+      default:
+        // Treat any other label as a category name
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ShopScreen(category: label),
+        ));
     }
   }
 
@@ -111,9 +207,7 @@ class _HomeScreenState extends State<HomeScreen>
     final isMobile = MediaQuery.of(context).size.width < 768;
 
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: Colors.white,
-      drawer: isMobile ? _buildDrawer(context) : null,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -132,81 +226,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ── Drawer (mobile nav) ──────────────────────────────────────────────────
-
-  Widget _buildDrawer(BuildContext context) {
-    return Drawer(
-      backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 28, 16, 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'VARÓN',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 7,
-                      color: Color(0xFF0A0A0A),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 20, color: Color(0xFF0A0A0A)),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-            Container(height: 1, color: const Color(0xFFEEEEEE)),
-            const SizedBox(height: 8),
-            for (final label in ['HOME', 'SHOP', 'SHIRTS', 'PANTS', 'CART', 'PROFILE'])
-              _DrawerNavItem(
-                label: label,
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _navigateToScreen(label, context);
-                },
-              ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-              child: SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _logout();
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFF0A0A0A)),
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                  ),
-                  child: const Text(
-                    'SIGN OUT',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 2.5,
-                      color: Color(0xFF0A0A0A),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -261,13 +280,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ],
-            ),
-          if (isMobile)
-            IconButton(
-              icon: const Icon(Icons.menu, color: Color(0xFF0A0A0A), size: 22),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
             ),
         ],
       ),
@@ -360,12 +372,10 @@ class _HomeScreenState extends State<HomeScreen>
   // ── Categories ────────────────────────────────────────────────────────────
 
   Widget _buildCategoriesSection(BuildContext context, bool isMobile) {
-    final categories = [
-      {'name': 'Shirts',      'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop'},
-      {'name': 'Pants',       'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop'},
-      {'name': 'T-Shirts',    'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop'},
-      {'name': 'Accessories', 'image': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop'},
-    ];
+    // Fall back to 4 static categories if DB hasn't loaded yet
+    final cats = _categories.isNotEmpty
+        ? _categories
+        : ['Tops', 'Bottoms', 'Footwear', 'Accessories'];
 
     return Container(
       width: double.infinity,
@@ -393,13 +403,13 @@ class _HomeScreenState extends State<HomeScreen>
                 mainAxisSpacing: spacing,
                 childAspectRatio: w / h,
               ),
-              itemCount: categories.length,
+              itemCount: cats.length,
               itemBuilder: (_, i) => _CategoryCard(
-                category: categories[i]['name']!,
-                imageUrl: categories[i]['image']!,
+                category: cats[i],
+                imageUrl: _catImage(cats[i]),
                 isMobile: isMobile,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => ShopScreen(category: categories[i]['name']!),
+                  builder: (_) => ShopScreen(category: cats[i]),
                 )),
               ),
             );
@@ -412,13 +422,6 @@ class _HomeScreenState extends State<HomeScreen>
   // ── Featured products ─────────────────────────────────────────────────────
 
   Widget _buildFeaturedProducts(BuildContext context, bool isMobile) {
-    final products = [
-      {'name': 'Classic White Shirt',     'price': '₱1,299', 'image': 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop'},
-      {'name': 'Slim Fit Black Pants',    'price': '₱1,899', 'image': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400&h=400&fit=crop'},
-      {'name': 'Premium Cotton T-Shirt',  'price': '₱599',   'image': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&h=400&fit=crop'},
-      {'name': 'Leather Minimalist Belt', 'price': '₱899',   'image': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400&h=400&fit=crop'},
-    ];
-
     return Container(
       width: double.infinity,
       color: const Color(0xFFF6F6F6),
@@ -445,25 +448,20 @@ class _HomeScreenState extends State<HomeScreen>
                 mainAxisSpacing: spacing,
                 childAspectRatio: w / h,
               ),
-              itemCount: products.length,
-              itemBuilder: (_, i) => _ProductCard(
-                name: products[i]['name']!,
-                price: products[i]['price']!,
-                imageUrl: products[i]['image']!,
-                isMobile: isMobile,
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const ShopScreen(),
-                )),
-                onAddToCart: () => ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${products[i]['name']} added to cart'),
-                    backgroundColor: const Color(0xFF0A0A0A),
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                  ),
-                ),
-              ),
+              itemCount: _featuredProducts.length,
+              itemBuilder: (_, i) {
+                final p = _featuredProducts[i];
+                return _ProductCard(
+                  name: p.name,
+                  price: '₱${p.price.toStringAsFixed(0)}',
+                  imageUrl: p.imageUrl,
+                  isMobile: isMobile,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const ShopScreen(),
+                  )),
+                  onAddToCart: () => _showVariantPicker(p),
+                );
+              },
             );
           }),
         ],
@@ -624,44 +622,6 @@ class _HoverButtonState extends State<_HoverButton> {
   }
 }
 
-class _DrawerNavItem extends StatefulWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _DrawerNavItem({required this.label, required this.onTap});
-
-  @override
-  State<_DrawerNavItem> createState() => _DrawerNavItemState();
-}
-
-class _DrawerNavItemState extends State<_DrawerNavItem> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          color: _hovered ? const Color(0xFFF6F6F6) : Colors.white,
-          child: Text(
-            widget.label,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 2.5,
-              color: Color(0xFF0A0A0A),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _FooterIcon extends StatefulWidget {
   final IconData icon;

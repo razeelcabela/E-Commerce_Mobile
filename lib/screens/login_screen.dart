@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/address_service.dart';
@@ -114,6 +115,15 @@ class _LoginScreenState extends State<LoginScreen>
     }
     if (!_emailPattern.hasMatch(signupEmailCtrl.text.trim())) {
       _showSnack('Enter a valid email address');
+      return;
+    }
+    final phone = phoneCtrl.text.trim();
+    if (!RegExp(r'^\d+$').hasMatch(phone)) {
+      _showSnack('Phone number must contain digits only');
+      return;
+    }
+    if (phone.length > 12) {
+      _showSnack('Phone number must not exceed 12 digits');
       return;
     }
     if (signupPassCtrl.text != confirmPassCtrl.text) {
@@ -505,7 +515,11 @@ class _LoginScreenState extends State<LoginScreen>
             keyboardType: TextInputType.emailAddress),
         const SizedBox(height: 16),
         _mobileField('Phone number', phoneCtrl,
-            keyboardType: TextInputType.phone),
+            keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(12),
+            ]),
         const SizedBox(height: 16),
         _mobileField('Password', signupPassCtrl,
             obscure: _obscureSignupPass,
@@ -620,11 +634,13 @@ class _LoginScreenState extends State<LoginScreen>
     bool obscure = false,
     VoidCallback? onToggleObscure,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextField(
       controller: ctrl,
       obscureText: obscure,
       keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
       style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF0A0A0A)),
       decoration: InputDecoration(
         labelText: label,
@@ -1033,6 +1049,10 @@ class _LoginScreenState extends State<LoginScreen>
           'Phone number',
           phoneCtrl,
           keyboardType: TextInputType.phone,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(12),
+          ],
         ),
         const SizedBox(height: 24),
         _field(
@@ -1164,6 +1184,7 @@ class _LoginScreenState extends State<LoginScreen>
     bool obscure = false,
     VoidCallback? onToggleObscure,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1182,6 +1203,7 @@ class _LoginScreenState extends State<LoginScreen>
           controller: ctrl,
           obscureText: obscure,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: GoogleFonts.inter(
             fontSize: 14,
             color: const Color(0xFF0A0A0A),

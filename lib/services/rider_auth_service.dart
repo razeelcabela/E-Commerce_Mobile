@@ -253,6 +253,74 @@ class RiderAuthService {
     }
   }
 
+  // ─── Apply from existing buyer account ────────────────────────────────────
+
+  /// Upgrades the currently logged-in buyer account to rider role.
+  /// Updates users.role to 'rider' and creates a riders row (status='pending').
+  /// Returns null on success, or an error message string on failure.
+  static Future<String?> applyAsRider({
+    required String fullName,
+    required String phoneNumber,
+    required String address,
+    required String driversLicense,
+  }) async {
+    try {
+      final session = _db.auth.currentSession;
+      if (session == null) return 'You must be logged in to apply as a rider.';
+
+      final authUid = session.user.id;
+
+      final userRow = await _db
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', authUid)
+          .maybeSingle();
+
+      if (userRow == null) return 'User profile not found.';
+      final userId = userRow['id'] as int;
+
+      final existing = await _db
+          .from('riders')
+          .select('id, status')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (existing != null) {
+        final s = existing['status'] as String;
+        if (s == 'pending') return 'Your rider application is already pending review.';
+        if (s == 'approved') return 'You already have an active rider account.';
+        if (s == 'suspended') return 'Your rider account has been suspended.';
+      }
+
+      final parts = fullName.trim().split(' ');
+
+      await _db.from('users').update({
+        'role': 'rider',
+        'first_name': parts.first,
+        'last_name': parts.length > 1 ? parts.sublist(1).join(' ') : '',
+        'phone': phoneNumber.trim(),
+      }).eq('id', userId);
+
+      await _db.from('riders').insert({
+        'user_id': userId,
+        'auth_user_id': authUid,
+        'license_number': driversLicense.trim(),
+        'vehicle_type': 'motorcycle',
+        'address': address.trim(),
+        'status': 'pending',
+      });
+
+      developer.log('Rider application submitted for: ${session.user.email}');
+      return null;
+    } on PostgrestException catch (e) {
+      developer.log('Rider application error: ${e.message}');
+      return 'Application failed: ${e.message}';
+    } catch (e) {
+      developer.log('Unexpected rider application error: $e');
+      return 'Application failed. Please try again.';
+    }
+  }
+
   // ─── Profile ───────────────────────────────────────────────────────────────
 
   /// Returns the rider row from the riders table, or null if not found.

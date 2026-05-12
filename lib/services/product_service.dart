@@ -2,69 +2,64 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 
+/// products.seller_id  →  sellers.id  (int, auto-increment PK of sellers table)
+/// sellers.user_id     →  users.id    (int)
+/// sellers.auth_user_id→  auth.users.id (UUID string)
 class ProductService {
   static final _client = Supabase.instance.client;
 
-  // In-memory cache: category_id → name
+  // ── Category cache ──────────────────────────────────────────────────────────
+
   static Map<int, String>? _categoryCache;
 
   static Future<Map<int, String>> _categoryMap() async {
-    if (_categoryCache != null) return _categoryCache!;
+    if (_categoryCache != null && _categoryCache!.isNotEmpty) return _categoryCache!;
     try {
       final rows = await _client
           .from('categories')
           .select('id, name')
-          .eq('is_active', 1)
           .order('name');
-      _categoryCache = {
-        for (final r in (rows as List))
-          (r['id'] as int): (r['name'] as String),
-      };
+      final list = rows as List;
+      if (list.isNotEmpty) {
+        _categoryCache = {
+          for (final r in list)
+            (r['id'] as num).toInt(): (r['name'] as String),
+        };
+        debugPrint('✅ ProductService categories: ${_categoryCache!.length} loaded');
+      } else {
+        debugPrint('⚠️ ProductService: categories table returned empty');
+      }
     } catch (e) {
       debugPrint('❌ Error loading category map: $e');
-      _categoryCache = {};
     }
-    return _categoryCache!;
+    return _categoryCache ?? {};
   }
 
-  // The Supabase Storage bucket where product images are stored.
-  // Change this if your bucket has a different name.
+  // ── Image helpers ───────────────────────────────────────────────────────────
+
   static const _imageBucket = 'products';
 
-  /// Converts a stored path to a full public URL.
-  /// Handles legacy web-server paths like "/static/images/products/file.png"
-  /// by extracting just the filename before calling getPublicUrl.
   static String _toPublicUrl(String raw) {
     if (raw.startsWith('http')) return raw;
-    // Strip any leading directory path — only the filename is used in Storage
     final filename = raw.contains('/') ? raw.split('/').last : raw;
     return _client.storage.from(_imageBucket).getPublicUrl(filename);
   }
 
-  /// Batch-fetch first image URL per product. Returns map product_id → url.
   static Future<Map<dynamic, String>> _imageMap(List<dynamic> ids) async {
-    if (ids.isEmpty) {
-      debugPrint('🖼️ _imageMap: no product IDs passed in');
-      return {};
-    }
-    debugPrint('🖼️ _imageMap: fetching images for ${ids.length} products, bucket="$_imageBucket"');
+    if (ids.isEmpty) return {};
     try {
       final rows = await _client
           .from('product_images')
           .select('product_id, image_url')
           .inFilter('product_id', ids);
-      debugPrint('🖼️ product_images rows returned: ${(rows as List).length}');
       final map = <dynamic, String>{};
-      for (final r in rows) {
+      for (final r in (rows as List)) {
         final pid = r['product_id'];
         if (!map.containsKey(pid)) {
           final raw = r['image_url'] as String? ?? '';
-          final url = raw.isEmpty ? '' : _toPublicUrl(raw);
-          map[pid] = url;
-          debugPrint('🖼️ product $pid | raw: "$raw" | url: "$url"');
+          map[pid] = raw.isEmpty ? '' : _toPublicUrl(raw);
         }
       }
-      debugPrint('🖼️ mapped ${map.length} of ${ids.length} products');
       return map;
     } catch (e) {
       debugPrint('❌ Error loading image map: $e');
@@ -72,21 +67,75 @@ class ProductService {
     }
   }
 
+  // ── Seller lookup ───────────────────────────────────────────────────────────
+  //
+  // products.seller_id == sellers.id (int)
+  // Query sellers directly by their PK — no FK constraint needed.
+
+  static Future<Map<int, Map<String, dynamic>>> _sellerMap(
+      List<dynamic> rawIds) async {
+    final ids = rawIds
+        .where((id) => id != null)
+        .map<int?>((id) {
+          if (id is num) return id.toInt();
+          return int.tryParse(id.toString());
+        })
+        .whereType<int>()
+        .toSet()
+        .toList();
+
+    if (ids.isEmpty) return {};
+
+    try {
+      final rows = await _client
+          .from('sellers')
+          .select()
+          .inFilter('id', ids);
+
+      final map = <int, Map<String, dynamic>>{};
+      for (final r in (rows as List)) {
+        final sid = (r['id'] as num).toInt();
+        map[sid] = r as Map<String, dynamic>;
+      }
+      debugPrint('🏪 Seller map: ${map.length} sellers loaded for ids=$ids');
+      return map;
+    } catch (e) {
+      debugPrint('❌ Error loading seller map: $e');
+      return {};
+    }
+  }
+
+  // ── Enrich ──────────────────────────────────────────────────────────────────
+
   static Map<String, dynamic> _enrich(
     Map<String, dynamic> json,
     Map<int, String> categories,
-    Map<dynamic, String> images,
-  ) {
+    Map<dynamic, String> images, {
+    Map<int, Map<String, dynamic>> sellers = const {},
+  }) {
     final catId = json['category_id'];
-    final catName = catId != null ? categories[catId as int] : null;
+    final catName =
+        catId != null ? categories[(catId as num).toInt()] : null;
+
+    final rawSellerId = json['seller_id'];
+    final sellerId = rawSellerId != null
+        ? (rawSellerId is num
+            ? rawSellerId.toInt()
+            : int.tryParse(rawSellerId.toString()))
+        : null;
+    final sellerData = sellerId != null ? sellers[sellerId] : null;
+
     return {
       ...json,
       'category': catName ?? 'Uncategorized',
       'image_url': images[json['id']] ?? '',
+      if (sellerData != null) 'sellers': sellerData,
     };
   }
 
-  /// Fetch all approved products.
+  // ── Public API ──────────────────────────────────────────────────────────────
+
+  /// Fetch all approved products with seller info.
   static Future<List<Product>> getAllProducts() async {
     try {
       final catMap = await _categoryMap();
@@ -100,12 +149,46 @@ class ProductService {
 
       final list = rows as List;
       final imgMap = await _imageMap(list.map((r) => r['id']).toList());
+      final selMap = await _sellerMap(
+          list.map((r) => r['seller_id']).toList());
 
       return list
-          .map((r) => Product.fromJson(_enrich(r as Map<String, dynamic>, catMap, imgMap)))
+          .map((r) => Product.fromJson(
+              _enrich(r as Map<String, dynamic>, catMap, imgMap,
+                  sellers: selMap)))
           .toList();
     } catch (e) {
       debugPrint('❌ Error fetching products: $e');
+      return [];
+    }
+  }
+
+  /// Fetch the 4 most recently added approved products for the featured section.
+  static Future<List<Product>> getFeatured() async {
+    try {
+      final catMap = await _categoryMap();
+      final rows = await _client
+          .from('products')
+          .select()
+          .eq('approval_status', 'approved')
+          .eq('is_active', 1)
+          .eq('archive_status', 'active')
+          .order('created_at', ascending: false)
+          .limit(4);
+
+      final list = rows as List;
+      if (list.isEmpty) return [];
+
+      final imgMap = await _imageMap(list.map((r) => r['id']).toList());
+      final selMap = await _sellerMap(list.map((r) => r['seller_id']).toList());
+
+      return list
+          .map((r) => Product.fromJson(
+              _enrich(r as Map<String, dynamic>, catMap, imgMap,
+                  sellers: selMap)))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching featured products: $e');
       return [];
     }
   }
@@ -114,7 +197,8 @@ class ProductService {
   static Future<List<Product>> getProductsByCategory(String category) async {
     try {
       final catMap = await _categoryMap();
-      final entry = catMap.entries.where((e) => e.value == category).firstOrNull;
+      final entry =
+          catMap.entries.where((e) => e.value == category).firstOrNull;
       if (entry == null) return [];
 
       final rows = await _client
@@ -127,13 +211,80 @@ class ProductService {
 
       final list = rows as List;
       final imgMap = await _imageMap(list.map((r) => r['id']).toList());
+      final selMap = await _sellerMap(
+          list.map((r) => r['seller_id']).toList());
 
       return list
-          .map((r) => Product.fromJson(_enrich(r as Map<String, dynamic>, catMap, imgMap)))
+          .map((r) => Product.fromJson(
+              _enrich(r as Map<String, dynamic>, catMap, imgMap,
+                  sellers: selMap)))
           .toList();
     } catch (e) {
       debugPrint('❌ Error fetching products by category: $e');
       return [];
+    }
+  }
+
+  /// Fetch all approved products by a specific seller (sellers.id).
+  static Future<List<Product>> getProductsBySellerId(dynamic sellerId) async {
+    if (sellerId == null) return [];
+    try {
+      final id = sellerId is num
+          ? sellerId.toInt()
+          : int.tryParse(sellerId.toString());
+      if (id == null) {
+        debugPrint('⚠️ getProductsBySellerId: invalid sellerId=$sellerId');
+        return [];
+      }
+
+      final catMap = await _categoryMap();
+      final rows = await _client
+          .from('products')
+          .select()
+          .eq('seller_id', id)
+          .eq('approval_status', 'approved')
+          .eq('is_active', 1)
+          .eq('archive_status', 'active')
+          .order('created_at', ascending: false);
+
+      final list = rows as List;
+      debugPrint('🏪 getProductsBySellerId($id): ${list.length} products');
+      final imgMap = await _imageMap(list.map((r) => r['id']).toList());
+      final selMap = await _sellerMap([id]);
+
+      return list
+          .map((r) => Product.fromJson(
+              _enrich(r as Map<String, dynamic>, catMap, imgMap,
+                  sellers: selMap)))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching seller products: $e');
+      return [];
+    }
+  }
+
+  /// Fetch the sellers row by sellers.id (int PK).
+  static Future<Map<String, dynamic>?> getSellerProfile(
+      dynamic sellerId) async {
+    if (sellerId == null) return null;
+    final id = sellerId is num
+        ? sellerId.toInt()
+        : int.tryParse(sellerId.toString());
+    if (id == null) {
+      debugPrint('⚠️ getSellerProfile: invalid sellerId=$sellerId');
+      return null;
+    }
+    try {
+      final row = await _client
+          .from('sellers')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+      debugPrint('🏪 getSellerProfile($id): ${row != null ? 'found' : 'not found'}');
+      return row;
+    } catch (e) {
+      debugPrint('❌ Error fetching seller profile: $e');
+      return null;
     }
   }
 
@@ -144,7 +295,7 @@ class ProductService {
     return names;
   }
 
-  /// Fetch a single product by ID.
+  /// Fetch a single product by ID with seller info.
   static Future<Product?> getProductById(dynamic productId) async {
     try {
       final catMap = await _categoryMap();
@@ -156,7 +307,8 @@ class ProductService {
 
       if (row == null) return null;
       final imgMap = await _imageMap([productId]);
-      return Product.fromJson(_enrich(row, catMap, imgMap));
+      final selMap = await _sellerMap([row['seller_id']]);
+      return Product.fromJson(_enrich(row, catMap, imgMap, sellers: selMap));
     } catch (e) {
       debugPrint('❌ Error fetching product: $e');
       return null;

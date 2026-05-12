@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import '../services/seller_application_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/seller_auth_service.dart';
 
 class SellerApplicationFormScreen extends StatefulWidget {
@@ -15,37 +14,16 @@ class _SellerApplicationFormScreenState
     extends State<SellerApplicationFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _emailCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _confirmPassCtrl = TextEditingController();
   final _fullNameCtrl = TextEditingController();
   final _storeNameCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
-  bool _obscurePass = true;
-  bool _obscureConfirm = true;
   bool _submitting = false;
   bool _submitted = false;
 
   @override
-  void initState() {
-    super.initState();
-    _prefillEmail();
-  }
-
-  Future<void> _prefillEmail() async {
-    final email = await AuthService.getUserEmail();
-    if (email != null && mounted) {
-      _emailCtrl.text = email;
-    }
-  }
-
-  @override
   void dispose() {
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    _confirmPassCtrl.dispose();
     _fullNameCtrl.dispose();
     _storeNameCtrl.dispose();
     _addressCtrl.dispose();
@@ -58,11 +36,7 @@ class _SellerApplicationFormScreenState
 
     setState(() => _submitting = true);
 
-    final buyerEmail = await AuthService.getUserEmail();
-
-    final error = await SellerAuthService.register(
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text,
+    final error = await SellerAuthService.applyAsSeller(
       storeName: _storeNameCtrl.text.trim(),
       fullName: _fullNameCtrl.text.trim(),
       address: _addressCtrl.text.trim(),
@@ -86,17 +60,40 @@ class _SellerApplicationFormScreenState
       return;
     }
 
-    // Auto-approve: set the buyer's role to seller immediately
-    if (buyerEmail != null) {
-      await SellerApplicationService.syncRole(
-          buyerEmail, SellerApplicationService.roleSeller);
-    }
-
-    if (!mounted) return;
     setState(() {
       _submitting = false;
       _submitted = true;
     });
+  }
+
+  Future<void> _logoutAndGoToLogin() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      try {
+        await Supabase.instance.client.auth.signOut();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+    }
   }
 
   @override
@@ -146,7 +143,7 @@ class _SellerApplicationFormScreenState
             ),
             const SizedBox(height: 28),
             const Text(
-              'SELLER ACCOUNT CREATED',
+              'APPLICATION SUBMITTED',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
@@ -157,8 +154,8 @@ class _SellerApplicationFormScreenState
             ),
             const SizedBox(height: 16),
             const Text(
-              'Your seller account is now active. You can access the seller '
-              'portal using your registered email and password.',
+              'Your seller application is pending admin review. '
+              'Log in again to check your application status.',
               style: TextStyle(
                 fontSize: 13,
                 color: Color(0xFF666666),
@@ -171,7 +168,7 @@ class _SellerApplicationFormScreenState
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
+                onPressed: _logoutAndGoToLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0A0A0A),
                   elevation: 0,
@@ -179,7 +176,7 @@ class _SellerApplicationFormScreenState
                       borderRadius: BorderRadius.zero),
                 ),
                 child: const Text(
-                  'GO TO PROFILE',
+                  'LOG IN',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -204,63 +201,14 @@ class _SellerApplicationFormScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Create your seller account on Varón and start selling to '
-              'thousands of customers.',
+              'Apply to sell on Varón. Your application will be reviewed '
+              'by our team before your seller account is activated.',
               style: TextStyle(
                 fontSize: 13,
                 color: Color(0xFF666666),
                 height: 1.7,
               ),
             ),
-            const SizedBox(height: 32),
-
-            // ── Seller Login Credentials ──────────────────────────────────
-            _sectionLabel('SELLER LOGIN CREDENTIALS'),
-            const SizedBox(height: 4),
-            const Text(
-              'Use these to sign in to the Seller Portal.',
-              style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'EMAIL ADDRESS',
-              controller: _emailCtrl,
-              hint: 'seller@example.com',
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Email is required';
-                if (!v.contains('@')) return 'Enter a valid email address';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'PASSWORD',
-              controller: _passwordCtrl,
-              hint: 'Min. 6 characters',
-              obscure: _obscurePass,
-              onToggleObscure: () =>
-                  setState(() => _obscurePass = !_obscurePass),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Password is required';
-                if (v.length < 6) return 'Password must be at least 6 characters';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            _field(
-              label: 'CONFIRM PASSWORD',
-              controller: _confirmPassCtrl,
-              hint: 'Re-enter password',
-              obscure: _obscureConfirm,
-              onToggleObscure: () =>
-                  setState(() => _obscureConfirm = !_obscureConfirm),
-              validator: (v) {
-                if (v != _passwordCtrl.text) return 'Passwords do not match';
-                return null;
-              },
-            ),
-
             const SizedBox(height: 32),
 
             // ── Store Information ─────────────────────────────────────────
@@ -334,7 +282,7 @@ class _SellerApplicationFormScreenState
                         ),
                       )
                     : const Text(
-                        'CREATE SELLER ACCOUNT',
+                        'SUBMIT APPLICATION',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -375,8 +323,6 @@ class _SellerApplicationFormScreenState
     String? hint,
     int maxLines = 1,
     TextInputType? keyboardType,
-    bool obscure = false,
-    VoidCallback? onToggleObscure,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -396,7 +342,6 @@ class _SellerApplicationFormScreenState
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
-          obscureText: obscure,
           validator: validator,
           style: const TextStyle(fontSize: 13, color: Color(0xFF0A0A0A)),
           decoration: InputDecoration(
@@ -405,23 +350,6 @@ class _SellerApplicationFormScreenState
                 const TextStyle(fontSize: 13, color: Color(0xFFCCCCCC)),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            suffixIcon: onToggleObscure != null
-                ? GestureDetector(
-                    onTap: onToggleObscure,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 14),
-                      child: Icon(
-                        obscure
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined,
-                        size: 16,
-                        color: const Color(0xFF888888),
-                      ),
-                    ),
-                  )
-                : null,
-            suffixIconConstraints:
-                const BoxConstraints(minWidth: 44, minHeight: 44),
             enabledBorder: const OutlineInputBorder(
               borderRadius: BorderRadius.zero,
               borderSide: BorderSide(color: Color(0xFFDDDDDD)),

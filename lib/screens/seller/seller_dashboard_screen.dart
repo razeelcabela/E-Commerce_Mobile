@@ -92,8 +92,30 @@ class _SellerDashboardScreenState extends State<SellerDashboardScreen> {
   }
 
   Future<void> _logout() async {
-    await SellerAuthService.logout();
-    if (mounted) Navigator.of(context).pushReplacementNamed('/login');
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldLogout == true) {
+      await SellerAuthService.logout();
+      if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    }
   }
 
   @override

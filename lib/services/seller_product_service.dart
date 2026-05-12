@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/seller_product.dart';
 import '../models/seller_dashboard_stats.dart';
+import '../models/product_variant.dart';
 import 'seller_auth_service.dart';
 
 class SellerProductService {
@@ -117,7 +118,7 @@ class SellerProductService {
     final base = name
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+\$'), '');
+        .replaceAll(RegExp(r'^-+|-+$'), '');
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     return '${base.isEmpty ? 'product' : base}-$timestamp';
   }
@@ -435,4 +436,41 @@ class SellerProductService {
   }
 
   static void clearCategoryCache() => _categoryCache = null;
+
+  // ── Variants ──────────────────────────────────────────────────────────────
+
+  static Future<List<ProductVariant>> getVariants(dynamic productId) async {
+    try {
+      final rows = await _client
+          .from('product_variants')
+          .select()
+          .eq('product_id', productId)
+          .order('id');
+      return (rows as List)
+          .map((r) => ProductVariant.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ Error fetching variants: $e');
+      return [];
+    }
+  }
+
+  /// Delete all existing variants then insert the new list.
+  /// Pass an empty list to clear all variants for a product.
+  static Future<void> saveVariants(
+      dynamic productId, List<ProductVariant> variants) async {
+    try {
+      await _client
+          .from('product_variants')
+          .delete()
+          .eq('product_id', productId);
+      if (variants.isNotEmpty) {
+        await _client
+            .from('product_variants')
+            .insert(variants.map((v) => v.toInsert(productId)).toList());
+      }
+    } catch (e) {
+      debugPrint('❌ Error saving variants: $e');
+    }
+  }
 }

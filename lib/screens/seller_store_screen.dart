@@ -43,13 +43,39 @@ class _SellerStoreScreenState extends State<SellerStoreScreen> {
       ProductService.getProductsBySellerId(widget.sellerId),
     ]);
     if (!mounted) return;
+
+    final profile = results[0] as Map<String, dynamic>?;
+    final products = results[1] as List<Product>;
+
+    // If the direct profile fetch failed, extract seller data from the
+    // first loaded product that carries a non-empty sellerName.
+    Map<String, dynamic>? resolvedProfile = profile;
+    if ((resolvedProfile == null || _storeName(resolvedProfile).isEmpty) &&
+        products.isNotEmpty) {
+      final withName = products.firstWhere(
+        (p) => p.sellerName.isNotEmpty,
+        orElse: () => products.first,
+      );
+      if (withName.sellerName.isNotEmpty) {
+        resolvedProfile = {
+          'store_name': withName.sellerName,
+          'logo_url': withName.sellerLogoUrl,
+          ...?profile,
+        };
+      }
+    }
+
     setState(() {
-      _profile = results[0] as Map<String, dynamic>?;
-      _all = results[1] as List<Product>;
-      _filtered = _all;
+      _profile = resolvedProfile;
+      _all = products;
+      _filtered = products;
       _loading = false;
     });
   }
+
+  /// Resolves store name from a profile map.
+  static String _storeName(Map<String, dynamic> p) =>
+      (p['store_name'] as String?)?.trim() ?? '';
 
   List<String> get _categories {
     final cats = _all.map((p) => p.category).toSet().toList()..sort();
@@ -85,8 +111,12 @@ class _SellerStoreScreenState extends State<SellerStoreScreen> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
-    final storeName =
-        (_profile?['store_name'] as String?) ?? widget.sellerName;
+    final resolvedName = _profile != null ? _storeName(_profile!) : '';
+    final storeName = resolvedName.isNotEmpty
+        ? resolvedName
+        : widget.sellerName.isNotEmpty
+            ? widget.sellerName
+            : 'Shop #${widget.sellerId}';
     final description = (_profile?['store_description'] as String?) ??
         (_profile?['description'] as String?) ??
         (_profile?['address'] as String?) ??

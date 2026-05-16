@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import '../services/address_service.dart';
 import '../services/auth_service.dart';
+import 'email_verification_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -85,6 +87,14 @@ class _LoginScreenState extends State<LoginScreen>
 
   void toggle(bool login) => setState(() => isLogin = login);
 
+  void _goBack() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacementNamed('/');
+    }
+  }
+
   Future<void> login() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
       _showSnack('Please enter email and password');
@@ -142,6 +152,16 @@ class _LoginScreenState extends State<LoginScreen>
     );
 
     if (!mounted) return;
+
+    if (error == 'VERIFY_EMAIL') {
+      setState(() => loading = false);
+      if (!mounted) return;
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => EmailVerificationScreen(
+            email: signupEmailCtrl.text.trim()),
+      ));
+      return;
+    }
 
     if (error != null) {
       setState(() => loading = false);
@@ -272,10 +292,21 @@ class _LoginScreenState extends State<LoginScreen>
 
   Widget _mobileBrandHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 52, 28, 40),
+      padding: const EdgeInsets.fromLTRB(20, 16, 28, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          GestureDetector(
+            onTap: _goBack,
+            child: const Icon(Icons.arrow_back_ios,
+                color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 28),
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           Text(
             'VARÓN',
             style: GoogleFonts.commissioner(
@@ -311,6 +342,9 @@ class _LoginScreenState extends State<LoginScreen>
               ),
             ),
           ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -341,7 +375,10 @@ class _LoginScreenState extends State<LoginScreen>
                     Align(
                       alignment: Alignment.centerRight,
                       child: GestureDetector(
-                        onTap: () {},
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen()),
+                        ),
                         child: Text(
                           'Forgot password?',
                           style: GoogleFonts.inter(
@@ -835,6 +872,29 @@ class _LoginScreenState extends State<LoginScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Back button
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: _goBack,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.arrow_back_ios,
+                    size: 14, color: Color(0xFF888888)),
+                const SizedBox(width: 4),
+                Text(
+                  'Back',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF888888),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
         // Tab row
         Row(
           children: [
@@ -864,7 +924,10 @@ class _LoginScreenState extends State<LoginScreen>
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: GestureDetector(
-                          onTap: () {},
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const ForgotPasswordScreen()),
+                          ),
                           child: Text(
                             'Forgot password?',
                             style: GoogleFonts.inter(

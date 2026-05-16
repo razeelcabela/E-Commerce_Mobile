@@ -87,17 +87,33 @@ class ProductService {
     if (ids.isEmpty) return {};
 
     try {
-      final rows = await _client
+      // Query by sellers.id first
+      var rows = await _client
           .from('sellers')
           .select()
           .inFilter('id', ids);
 
+      // If none found, products may store sellers.user_id instead of sellers.id
+      if ((rows as List).isEmpty) {
+        rows = await _client
+            .from('sellers')
+            .select()
+            .inFilter('user_id', ids);
+      }
+
       final map = <int, Map<String, dynamic>>{};
       for (final r in (rows as List)) {
-        final sid = (r['id'] as num).toInt();
-        map[sid] = r as Map<String, dynamic>;
+        final data = r as Map<String, dynamic>;
+        // Index by sellers.id
+        final sid = (data['id'] as num).toInt();
+        map[sid] = data;
+        // Also index by sellers.user_id so either FK value resolves
+        final uid = data['user_id'];
+        if (uid != null) {
+          map.putIfAbsent((uid as num).toInt(), () => data);
+        }
       }
-      debugPrint('🏪 Seller map: ${map.length} sellers loaded for ids=$ids');
+      debugPrint('🏪 Seller map: ${map.length} entries loaded for ids=$ids');
       return map;
     } catch (e) {
       debugPrint('❌ Error loading seller map: $e');
@@ -137,30 +153,26 @@ class ProductService {
 
   /// Fetch all approved products with seller info.
   static Future<List<Product>> getAllProducts() async {
-    try {
-      final catMap = await _categoryMap();
-      final rows = await _client
-          .from('products')
-          .select()
-          .eq('approval_status', 'approved')
-          .eq('is_active', 1)
-          .eq('archive_status', 'active')
-          .order('created_at', ascending: false);
+    final catMap = await _categoryMap();
+    // Let the products query throw — callers can catch and show retry UI.
+    final rows = await _client
+        .from('products')
+        .select()
+        .or('approval_status.eq.approved,approval_status.is.null')
+        .or('archive_status.eq.active,archive_status.is.null')
+        .order('created_at', ascending: false);
 
-      final list = rows as List;
-      final imgMap = await _imageMap(list.map((r) => r['id']).toList());
-      final selMap = await _sellerMap(
-          list.map((r) => r['seller_id']).toList());
+    final list = rows as List;
+    if (list.isEmpty) return [];
 
-      return list
-          .map((r) => Product.fromJson(
-              _enrich(r as Map<String, dynamic>, catMap, imgMap,
-                  sellers: selMap)))
-          .toList();
-    } catch (e) {
-      debugPrint('❌ Error fetching products: $e');
-      return [];
-    }
+    final imgMap = await _imageMap(list.map((r) => r['id']).toList());
+    final selMap = await _sellerMap(list.map((r) => r['seller_id']).toList());
+
+    return list
+        .map((r) => Product.fromJson(
+            _enrich(r as Map<String, dynamic>, catMap, imgMap,
+                sellers: selMap)))
+        .toList();
   }
 
   /// Fetch the 4 most recently added approved products for the featured section.
@@ -170,9 +182,8 @@ class ProductService {
       final rows = await _client
           .from('products')
           .select()
-          .eq('approval_status', 'approved')
-          .eq('is_active', 1)
-          .eq('archive_status', 'active')
+          .or('approval_status.eq.approved,approval_status.is.null')
+          .or('archive_status.eq.active,archive_status.is.null')
           .order('created_at', ascending: false)
           .limit(4);
 
@@ -205,8 +216,8 @@ class ProductService {
           .from('products')
           .select()
           .eq('category_id', entry.key)
-          .eq('approval_status', 'approved')
-          .eq('is_active', 1)
+          .or('approval_status.eq.approved,approval_status.is.null')
+          .or('archive_status.eq.active,archive_status.is.null')
           .order('created_at', ascending: false);
 
       final list = rows as List;
@@ -242,9 +253,8 @@ class ProductService {
           .from('products')
           .select()
           .eq('seller_id', id)
-          .eq('approval_status', 'approved')
-          .eq('is_active', 1)
-          .eq('archive_status', 'active')
+          .or('approval_status.eq.approved,approval_status.is.null')
+          .or('archive_status.eq.active,archive_status.is.null')
           .order('created_at', ascending: false);
 
       final list = rows as List;
@@ -263,7 +273,7 @@ class ProductService {
     }
   }
 
-  /// Fetch the sellers row by sellers.id (int PK).
+  /// Fetch the sellers row — tries sellers.id first, then sellers.user_id.
   static Future<Map<String, dynamic>?> getSellerProfile(
       dynamic sellerId) async {
     if (sellerId == null) return null;
@@ -275,12 +285,21 @@ class ProductService {
       return null;
     }
     try {
-      final row = await _client
+      // Try by sellers.id (PK)
+      var row = await _client
           .from('sellers')
           .select()
           .eq('id', id)
           .maybeSingle();
-      debugPrint('🏪 getSellerProfile($id): ${row != null ? 'found' : 'not found'}');
+
+      // Fallback: products might store sellers.user_id as the seller_id
+      row ??= await _client
+          .from('sellers')
+          .select()
+          .eq('user_id', id)
+          .maybeSingle();
+
+      debugPrint('🏪 getSellerProfile($id): ${row != null ? 'found → ${row['store_name']}' : 'not found'}');
       return row;
     } catch (e) {
       debugPrint('❌ Error fetching seller profile: $e');

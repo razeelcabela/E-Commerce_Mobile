@@ -9,6 +9,7 @@ import '../models/product.dart';
 import '../services/auth_service.dart';
 import '../services/cart_service.dart';
 import '../services/order_service.dart';
+import '../services/product_service.dart';
 import '../widgets/variant_picker_sheet.dart';
 import 'checkout_screen.dart';
 import 'seller_store_screen.dart';
@@ -33,6 +34,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _hasPurchased = false;
   List<Map<String, dynamic>> _reviews = [];
 
+  // Seller state — fetched lazily so the card always shows
+  Map<String, dynamic>? _sellerProfile;
+
   static const _colors = [
     {'label': 'Black',  'hex': 0xFF0A0A0A},
     {'label': 'White',  'hex': 0xFFF5F5F5},
@@ -51,6 +55,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _quantityController = TextEditingController(text: '$quantity');
     _checkPurchase();
     _loadReviews();
+    _loadSellerProfile();
   }
 
   @override
@@ -78,6 +83,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (raw == null || !mounted) return;
     final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
     setState(() => _reviews = list);
+  }
+
+  Future<void> _loadSellerProfile() async {
+    if (widget.product.sellerId == null) return;
+    final profile =
+        await ProductService.getSellerProfile(widget.product.sellerId);
+    if (profile != null) {
+      debugPrint('🏪 seller profile keys: ${profile.keys.toList()}');
+      debugPrint('🏪 seller profile: $profile');
+    }
+    if (mounted && profile != null) {
+      setState(() => _sellerProfile = profile);
+    }
   }
 
   Future<void> _saveReview(int rating, String text) async {
@@ -540,40 +558,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
 
-                  // ── Visit shop button ──────────────────────────────────────
-                  if (widget.product.sellerName.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => SellerStoreScreen(
-                            sellerId: widget.product.sellerId,
-                            sellerName: widget.product.sellerName,
-                            sellerLogoUrl: widget.product.sellerLogoUrl,
-                          ),
-                        )),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0A0A0A),
-                          side: const BorderSide(
-                              color: Color(0xFFDDDDDD), width: 1.5),
-                          shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero),
-                        ),
-                        icon: const Icon(Icons.storefront_outlined, size: 16),
-                        label: Text(
-                          'VISIT SHOP',
-                          style: GoogleFonts.commissioner(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  // ── Seller card ────────────────────────────────────────────
+                  const SizedBox(height: 28),
+                  _SellerSection(
+                    sellerId: widget.product.sellerId,
+                    sellerName: (_sellerProfile?['store_name'] as String?)
+                        ?? widget.product.sellerName,
+                    sellerLogoUrl: (_sellerProfile?['logo_url'] as String?)
+                        ?? (_sellerProfile?['avatar_url'] as String?)
+                        ?? widget.product.sellerLogoUrl,
+                  ),
                   const SizedBox(height: 40),
 
                   // ── Product details accordion ──────────────────────────────
@@ -627,10 +621,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     hasPurchased: _hasPurchased,
                     onSubmit: _saveReview,
                   ),
-                  if (widget.product.sellerName.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    _SellerSection(product: widget.product),
-                  ],
                   const SizedBox(height: 32),
                 ],
               ),
@@ -896,23 +886,31 @@ class _ReviewCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _SellerSection extends StatelessWidget {
-  final Product product;
-  const _SellerSection({required this.product});
+  final dynamic sellerId;
+  final String sellerName;
+  final String sellerLogoUrl;
+
+  const _SellerSection({
+    required this.sellerId,
+    required this.sellerName,
+    required this.sellerLogoUrl,
+  });
 
   void _goToStore(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => SellerStoreScreen(
-        sellerId: product.sellerId,
-        sellerName: product.sellerName,
-        sellerLogoUrl: product.sellerLogoUrl,
+        sellerId: sellerId,
+        sellerName: sellerName,
+        sellerLogoUrl: sellerLogoUrl,
       ),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final initials = product.sellerName.trim().isNotEmpty
-        ? product.sellerName.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
+    if (sellerId == null && sellerName.isEmpty) return const SizedBox.shrink();
+    final initials = sellerName.trim().isNotEmpty
+        ? sellerName.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
         : 'S';
 
     return Column(
@@ -947,10 +945,10 @@ class _SellerSection extends StatelessWidget {
                     color: Color(0xFF0A0A0A),
                     shape: BoxShape.circle,
                   ),
-                  child: product.sellerLogoUrl.isNotEmpty
+                  child: sellerLogoUrl.isNotEmpty
                       ? ClipOval(
                           child: Image.network(
-                            product.sellerLogoUrl,
+                            sellerLogoUrl,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => Center(
                               child: Text(initials,
@@ -985,7 +983,7 @@ class _SellerSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        product.sellerName,
+                        sellerName,
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

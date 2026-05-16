@@ -73,7 +73,7 @@ class _AuthLoadingScreenState extends State<AuthLoadingScreen>
       if (!mounted) return;
 
       if (role == UserRole.none) {
-        Navigator.of(context).pushReplacementNamed('/onboarding');
+        Navigator.of(context).pushReplacementNamed('/home');
         return;
       }
 

@@ -26,7 +26,7 @@ enum UserRole {
       case UserRole.seller: return '/seller/dashboard';
       case UserRole.rider:  return '/rider/dashboard';
       case UserRole.admin:  return '/admin/dashboard';
-      case UserRole.none:   return '/onboarding';
+      case UserRole.none:   return '/home';
     }
   }
 }
@@ -135,7 +135,7 @@ class UnifiedAuthService {
   /// Determine the appropriate route for the current user based on their role.
   static Future<String> determineRoute() async {
     final role = await getUserRole();
-    if (role == UserRole.none) return '/onboarding';
+    if (role == UserRole.none) return '/home';
     await setLastActiveRole(role);
     return role.route;
   }

@@ -2,18 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product.dart';
+import 'size_guide_widget.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data types
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum ProductSizeType { tops, bottoms, footwear, none }
-
-class SizeOption {
-  final String label;
-  final bool outOfStock;
-  const SizeOption(this.label, {this.outOfStock = false});
-}
+// ProductSizeType and SizeOption are now defined in size_guide_widget.dart.
 
 class ColorOption {
   final String label;
@@ -46,83 +41,19 @@ class VariantPickerSheet extends StatefulWidget {
     this.onBuyNow,
   });
 
-  // ── Category sets ─────────────────────────────────────────────────────────
+  // ── Public static helpers — delegate to SizeGuide ─────────────────────────
 
-  static const Set<String> _topCategories = {
-    'tops',
-    'barong', 'suits & blazers', 'casual shirts', 'polo shirts',
-    'outerwear & jackets', 'activewear & fitness tops',
-    'shirt', 'shirts', 'polo shirt',
-  };
-
-  static const Set<String> _bottomCategories = {
-    'bottoms',
-    'jeans & denim', 'chinos & trousers', 'shorts',
-    'joggers & sweatpants', 'formal pants',
-    'pants', 'jeans',
-  };
-
-  static const Set<String> _footwearCategories = {
-    'footwear',
-    'sneakers', 'loafers & dress shoes', 'sandals & slides',
-    'boots', 'athletic shoes',
-    'shoe', 'shoes', 'sneaker', 'sandals',
-  };
-
-  // ── Size option lists ─────────────────────────────────────────────────────
-
-  static const List<SizeOption> _topSizes = [
-    SizeOption('XS'), SizeOption('S'), SizeOption('M'),
-    SizeOption('L'), SizeOption('XL'), SizeOption('XXL'),
-  ];
-
-  static const List<SizeOption> _bottomSizes = [
-    SizeOption('28'), SizeOption('30'), SizeOption('32'),
-    SizeOption('34'), SizeOption('36'), SizeOption('38'),
-  ];
-
-  static const List<SizeOption> _footwearSizes = [
-    SizeOption('39'), SizeOption('40'), SizeOption('41'),
-    SizeOption('42'), SizeOption('43'), SizeOption('44'), SizeOption('45'),
-  ];
-
-  // ── Public static helpers ─────────────────────────────────────────────────
-
-  static ProductSizeType sizeTypeForCategory(String category) {
-    final cat = category.toLowerCase().trim();
-    if (_topCategories.contains(cat)) return ProductSizeType.tops;
-    if (_bottomCategories.contains(cat)) return ProductSizeType.bottoms;
-    if (_footwearCategories.contains(cat)) return ProductSizeType.footwear;
-    return ProductSizeType.none;
-  }
+  static ProductSizeType sizeTypeForCategory(String category) =>
+      SizeGuide.typeFor(category);
 
   static bool needsSizeForCategory(String category) =>
-      sizeTypeForCategory(category) != ProductSizeType.none;
+      SizeGuide.hasSizeGuide(category);
 
-  static List<SizeOption> sizesForCategory(String category) {
-    switch (sizeTypeForCategory(category)) {
-      case ProductSizeType.tops:
-        return _topSizes;
-      case ProductSizeType.bottoms:
-        return _bottomSizes;
-      case ProductSizeType.footwear:
-        return _footwearSizes;
-      case ProductSizeType.none:
-        return _topSizes; // fallback — shouldn't reach for sized products
-    }
-  }
+  static List<SizeOption> sizesForCategory(String category) =>
+      SizeGuide.sizesFor(category);
 
-  /// Opens the category-appropriate size guide in a bottom sheet.
-  static void showSizeGuideModal(BuildContext context, String category) {
-    final type = sizeTypeForCategory(category);
-    if (type == ProductSizeType.none) return;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-      builder: (_) => _SizeGuideSheet(sizeType: type),
-    );
-  }
+  static void showSizeGuideModal(BuildContext context, String category) =>
+      SizeGuide.showModal(context, category);
 
   /// Show the variant picker bottom sheet. Size requirement is auto-detected.
   static Future<void> show(
@@ -757,101 +688,4 @@ class _StrikethroughPainter extends CustomPainter {
   bool shouldRepaint(_StrikethroughPainter _) => false;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Size guide sheet — category-appropriate measurement table
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SizeGuideSheet extends StatelessWidget {
-  final ProductSizeType sizeType;
-  const _SizeGuideSheet({required this.sizeType});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'SIZE GUIDE',
-            style: GoogleFonts.commissioner(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 3,
-                color: const Color(0xFF0A0A0A)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            sizeType == ProductSizeType.tops
-                ? 'Tops & Shirts'
-                : sizeType == ProductSizeType.bottoms
-                    ? 'Pants & Bottoms'
-                    : 'Footwear',
-            style:
-                GoogleFonts.inter(fontSize: 11, color: const Color(0xFF888888)),
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFEEEEEE)),
-          const SizedBox(height: 12),
-          if (sizeType == ProductSizeType.tops) ..._topsRows(),
-          if (sizeType == ProductSizeType.bottoms) ..._bottomsRows(),
-          if (sizeType == ProductSizeType.footwear) ..._footwearRows(),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _topsRows() => [
-        _row('SIZE', 'CHEST', 'WAIST', 'HIP', isHeader: true),
-        _row('XS',  '32–34"', '26–28"', '34–36"'),
-        _row('S',   '34–36"', '28–30"', '36–38"'),
-        _row('M',   '37–39"', '31–33"', '39–41"'),
-        _row('L',   '40–42"', '34–36"', '42–44"'),
-        _row('XL',  '43–45"', '37–39"', '45–47"'),
-        _row('XXL', '46–48"', '40–42"', '48–50"'),
-      ];
-
-  List<Widget> _bottomsRows() => [
-        _row('SIZE', 'WAIST', 'HIP', 'INSEAM', isHeader: true),
-        _row('28', '28"', '36"', '30"'),
-        _row('30', '30"', '38"', '30"'),
-        _row('32', '32"', '40"', '30.5"'),
-        _row('34', '34"', '42"', '31"'),
-        _row('36', '36"', '44"', '31.5"'),
-        _row('38', '38"', '46"', '32"'),
-      ];
-
-  List<Widget> _footwearRows() => [
-        _row('EU', 'US', 'UK', 'CM', isHeader: true),
-        _row('39', '6.5', '6',    '24.5'),
-        _row('40', '7',   '6.5',  '25'),
-        _row('41', '7.5', '7',    '25.5'),
-        _row('42', '8.5', '8',    '26.5'),
-        _row('43', '9',   '8.5',  '27'),
-        _row('44', '10',  '9.5',  '28'),
-        _row('45', '11',  '10.5', '29'),
-      ];
-
-  Widget _row(String a, String b, String c, String d,
-      {bool isHeader = false}) {
-    final style = isHeader
-        ? GoogleFonts.commissioner(
-            fontSize: 9,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFF888888),
-            letterSpacing: 1.5)
-        : GoogleFonts.inter(fontSize: 12, color: const Color(0xFF0A0A0A));
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(a, style: style)),
-          Expanded(child: Text(b, style: style, textAlign: TextAlign.center)),
-          Expanded(child: Text(c, style: style, textAlign: TextAlign.center)),
-          Expanded(child: Text(d, style: style, textAlign: TextAlign.right)),
-        ],
-      ),
-    );
-  }
-}
+// Size guide sheet is now SizeGuideSheet in size_guide_widget.dart.

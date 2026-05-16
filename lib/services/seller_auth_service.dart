@@ -339,14 +339,69 @@ class SellerAuthService {
       if (session == null) return 'You must be logged in to apply as a seller.';
 
       final authUid = session.user.id;
+      final email   = (session.user.email ?? '').trim();
 
-      final userRow = await _db
+      // ── Step 1: locate the users row ────────────────────────────────────────
+
+      // Try by auth_user_id (the normal case)
+      Map<String, dynamic>? userRow = await _db
           .from('users')
           .select('id')
           .eq('auth_user_id', authUid)
           .maybeSingle();
 
-      if (userRow == null) return 'User profile not found.';
+      // Fallback: try by email (profile created without auth_user_id link)
+      if (userRow == null && email.isNotEmpty) {
+        userRow = await _db
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+        // Patch the missing auth_user_id while we're here
+        if (userRow != null) {
+          try {
+            await _db
+                .from('users')
+                .update({'auth_user_id': authUid})
+                .eq('id', userRow['id'] as int);
+          } catch (_) {}
+        }
+      }
+
+      // Fallback: profile was never created — auto-create it now
+      if (userRow == null && email.isNotEmpty) {
+        try {
+          final parts = fullName.trim().split(' ');
+          final inserted = await _db.from('users').insert({
+            'email': email,
+            'auth_user_id': authUid,
+            'first_name': parts.first,
+            'last_name': parts.length > 1 ? parts.sublist(1).join(' ') : '',
+            'phone': phoneNumber.trim(),
+            'role': 'buyer',
+            'account_status': 'active',
+            'buyer_approval_status': 'approved',
+            'created_at': DateTime.now().toIso8601String(),
+          }).select('id').single();
+          userRow = inserted;
+          developer.log('applyAsSeller: auto-created missing user profile for $email');
+        } on PostgrestException catch (e) {
+          // Duplicate row — another path created it; try fetching again
+          if (e.code == '23505') {
+            userRow = await _db
+                .from('users')
+                .select('id')
+                .eq('email', email)
+                .maybeSingle();
+          }
+        }
+      }
+
+      if (userRow == null) {
+        return 'Unable to locate your account. Please log out, log back in, and try again.';
+      }
+
       final userId = userRow['id'] as int;
 
       final existing = await _db

@@ -251,9 +251,16 @@ class AuthService {
     }
     
     try {
+      // Pass profile data as metadata so the DB trigger can create the
+      // users row even when email confirmation is enabled (no session yet).
       final authResponse = await _db.auth.signUp(
         email: normalizedEmail,
         password: password,
+        data: {
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'phone': phone.trim(),
+        },
       );
 
       final userId = authResponse.user?.id;
@@ -265,6 +272,14 @@ class AuthService {
       developer.log('Auth signup successful for: $normalizedEmail');
       developer.log('Creating profile for auth user: $userId');
 
+      // If Supabase requires email confirmation, session is null.
+      // Signal the caller to show the OTP verification screen.
+      if (authResponse.session == null) {
+        developer.log('Email confirmation required for: $normalizedEmail');
+        return 'VERIFY_EMAIL';
+      }
+
+      // Session available (email confirmation disabled) — create profile now.
       try {
         await _db.from('users').insert({
           'email': normalizedEmail,
@@ -274,28 +289,24 @@ class AuthService {
           'phone': phone.trim(),
           'role': 'buyer',
           'account_status': 'active',
-          'buyer_approval_status': 'approved',
+          'password': '',
           'created_at': DateTime.now().toIso8601String(),
         });
-
         developer.log('Profile created successfully for: $normalizedEmail');
-        
-        // Step 3: Save to local preferences for session management
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool(_loginKey, true);
-        await prefs.setString(_userEmailKey, normalizedEmail);
-        await prefs.remove(_userIdKey);
-        developer.log('Session saved for: $normalizedEmail');
-        
       } on PostgrestException catch (e) {
-        // Profile insert failed — try to clean up the auth account
-        developer.log('Profile creation error: ${e.message} (code: ${e.code})');
-        
-        return 'Failed to create user profile. ${e.message}';
-      } on AuthException catch (e) {
-        developer.log('Auth error while creating profile: ${e.message} (code: ${e.statusCode})');
-        return 'Failed to create user profile. ${e.message}';
+        if (e.code == '23505' || e.code == '42501') {
+          developer.log('Profile handled by trigger (code: ${e.code})');
+        } else {
+          developer.log('Profile creation error: ${e.message} (code: ${e.code})');
+          return 'Failed to create user profile. ${e.message}';
+        }
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_loginKey, true);
+      await prefs.setString(_userEmailKey, normalizedEmail);
+      await prefs.remove(_userIdKey);
+      developer.log('Session saved for: $normalizedEmail');
 
       developer.log('Signup completed successfully for: $normalizedEmail');
       
@@ -324,6 +335,120 @@ class AuthService {
     } catch (e, stackTrace) {
       developer.log('Unexpected signup error: $e\n$stackTrace');
       return 'Sign up failed: An unexpected error occurred. Please try again.';
+    }
+  }
+
+  // ─── Email OTP Verification ────────────────────────────────────────────────
+
+  /// Verifies the 6-digit OTP sent to the user's email after signup.
+  /// Returns null on success, or an error message string on failure.
+  static Future<String?> verifyEmailOtp({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      final response = await _db.auth.verifyOTP(
+        email: email.trim(),
+        token: token.trim(),
+        type: OtpType.signup,
+      );
+
+      if (response.session != null) {
+        final userId = response.user?.id;
+        // Create the profile row now that the user is fully authenticated.
+        if (userId != null) {
+          try {
+            await _db.from('users').insert({
+              'email': email.trim(),
+              'auth_user_id': userId,
+              'role': 'buyer',
+              'account_status': 'active',
+              'password': '',
+            });
+          } on PostgrestException catch (e) {
+            // 23505 = duplicate (trigger already created it) — OK.
+            if (e.code != '23505') {
+              developer.log('Profile insert after OTP error: ${e.message}');
+            }
+          }
+        }
+        // Sign out after verification so user must log in manually.
+        await _db.auth.signOut();
+      }
+
+      return null;
+    } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('expired')) return 'Code has expired. Please request a new one.';
+      if (msg.contains('invalid')) return 'Invalid code. Please check and try again.';
+      return e.message;
+    } catch (e) {
+      return 'Verification failed. Please try again.';
+    }
+  }
+
+  /// Resends the OTP verification email.
+  static Future<String?> resendVerificationEmail(String email) async {
+    try {
+      await _db.auth.resend(type: OtpType.signup, email: email.trim());
+      return null;
+    } on AuthException catch (e) {
+      if (e.statusCode == '429') return 'Too many requests. Please wait before resending.';
+      return e.message;
+    } catch (e) {
+      return 'Failed to resend. Please try again.';
+    }
+  }
+
+  // ─── Profile ───────────────────────────────────────────────────────────────
+
+  // ─── Password Reset ────────────────────────────────────────────────────────
+
+  /// Sends a 6-digit OTP to the email for password reset.
+  static Future<String?> sendPasswordResetOtp(String email) async {
+    try {
+      await _db.auth.resetPasswordForEmail(email.trim());
+      return null;
+    } on AuthException catch (e) {
+      if (e.statusCode == '429') return 'Too many requests. Please wait before trying again.';
+      return e.message;
+    } catch (e) {
+      return 'Failed to send reset code. Please try again.';
+    }
+  }
+
+  /// Verifies the password reset OTP. Returns null on success.
+  static Future<String?> verifyPasswordResetOtp({
+    required String email,
+    required String token,
+  }) async {
+    try {
+      await _db.auth.verifyOTP(
+        email: email.trim(),
+        token: token.trim(),
+        type: OtpType.recovery,
+      );
+      return null;
+    } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('expired')) return 'Code has expired. Please request a new one.';
+      if (msg.contains('invalid')) return 'Invalid code. Please check and try again.';
+      return e.message;
+    } catch (e) {
+      return 'Verification failed. Please try again.';
+    }
+  }
+
+  /// Updates the authenticated user's password after OTP verification.
+  static Future<String?> updatePassword(String newPassword) async {
+    try {
+      await _db.auth.updateUser(UserAttributes(password: newPassword));
+      await _db.auth.signOut();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Failed to update password. Please try again.';
     }
   }
 
